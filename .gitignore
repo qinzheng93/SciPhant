@@ -1,6 +1,5 @@
 .env
 *.db
-!resources/conference_papers.db
 *.sqlite
 *-shm
 *-wal

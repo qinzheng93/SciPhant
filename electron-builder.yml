@@ -8,9 +8,6 @@ directories:
 files:
   - dist/**/*
   - node_modules/sql.js/**/*
-extraResources:
-  - from: resources/conference_papers.db
-    to: conference_papers.db
 mac:
   icon: resources/icon.icns
   category: public.app-category.productivity
