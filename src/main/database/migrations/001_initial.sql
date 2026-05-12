@@ -16,10 +16,3 @@ CREATE TABLE IF NOT EXISTS categories (
     name TEXT NOT NULL UNIQUE,
     enabled BOOLEAN DEFAULT TRUE
 );
-
-CREATE TABLE IF NOT EXISTS analyses (
-    paper_id TEXT PRIMARY KEY,
-    summary TEXT DEFAULT '',
-    analysis TEXT DEFAULT '',
-    FOREIGN KEY (paper_id) REFERENCES papers(id)
-);

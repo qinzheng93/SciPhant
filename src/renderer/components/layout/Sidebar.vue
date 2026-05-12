@@ -71,6 +71,10 @@
     <!-- conference mode -->
     <template v-else>
     <div class="actions-col">
+      <button class="btn-fetch" @click="showImportDialog = true">
+        <Import :size="13" />
+        导入会议
+      </button>
       <div class="menu-wrapper">
         <button class="btn-fetch" :class="{ active: activeMenu === 'summarize' }" :disabled="progressStore.isFetching" @click="toggleMenu('summarize')">
           <PenLine :size="13" />
@@ -305,12 +309,19 @@
       </div>
     </div>
   </Teleport>
+
+  <ImportConferenceDialog
+    v-if="showImportDialog"
+    @close="showImportDialog = false"
+    @imported="onConferenceImported"
+    @failed="onConferenceImportFailed"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Download, PenLine, Settings, ListChecks } from 'lucide-vue-next'
+import { Download, PenLine, Settings, ListChecks, Import } from 'lucide-vue-next'
 import { fetchArxivPapers, fetchArxivPapersThisWeek, fetchArxivPapersByDate, listCategories, listArxivPapers, listConferencePapers, checkArxivSummaryStatus, conferenceCheckPapersSummaryStatus } from '../../api'
 import type { Category } from '../../types/config'
 import { usePapersStore } from '../../stores/papers'
@@ -322,6 +333,7 @@ import { useAnalysisQueueStore } from '../../stores/analysisQueue'
 import { useDownloadQueueStore } from '../../stores/downloadQueue'
 import { useToastStore } from '../../stores/toast'
 import { extractErrorMessage } from '../../utils/format'
+import ImportConferenceDialog from '../conference/ImportConferenceDialog.vue'
 
 const router = useRouter()
 const papersStore = usePapersStore()
@@ -337,6 +349,7 @@ let fetchingToastId = -1
 // ── Conference grouping ──────────────────────────────────
 
 const expandedGroup = ref<string | null>(null)
+const showImportDialog = ref(false)
 
 const conferenceGroups = computed(() => {
   const map = new Map<string, typeof conferenceStore.conferences>()
@@ -422,6 +435,24 @@ const selectDate = (date: string | null) => {
 }
 
 const goToConfig = () => router.push('/config')
+
+// ── Conference import ──────────────────────────────────
+
+const onConferenceImported = async (result: { importedConferences: number; importedPapers: number; skippedConferences: number }) => {
+  await conferenceStore.loadConferences()
+  await conferenceStore.loadPapers()
+  const parts = [`导入 ${result.importedConferences} 个会议，${result.importedPapers} 篇论文`]
+  if (result.skippedConferences > 0) {
+    parts.push(`跳过 ${result.skippedConferences} 个会议`)
+  }
+  toastStore.show('导入完成', parts.join('，'), 'success')
+  showImportDialog.value = false
+}
+
+const onConferenceImportFailed = (error: string) => {
+  toastStore.show('导入失败', error, 'error')
+  showImportDialog.value = false
+}
 
 // ── Fetch logic ──────────────────────────────────────
 
@@ -1232,11 +1263,12 @@ const summarizeSelectedPapers = async () => {
 .sidebar-dialog .dialog-title {
   font-size: 16px;
   font-weight: 600;
+  margin: 0;
   padding: 20px 24px 0;
 }
 
 .sidebar-dialog .dialog-body {
-  padding: 20px 24px;
+  padding: 12px 24px 20px;
 }
 
 .sidebar-dialog .form-group {

@@ -97,6 +97,11 @@ const api = {
   conferenceDeleteSummary: (id: string) => ipcRenderer.invoke('conference:delete-summary', id),
   conferenceDeleteAnalysis: (id: string) => ipcRenderer.invoke('conference:delete-analysis', id),
   conferenceExportToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => ipcRenderer.invoke('conference:export-to-zotero', paperId, collectionKey, summaryHtml, analysisHtml),
+
+  // Conference import
+  conferenceReadImportFile: () => ipcRenderer.invoke('conference:read-import-file'),
+  conferenceCheckConflicts: (filePath: string, selectedIds: number[]) => ipcRenderer.invoke('conference:check-conflicts', filePath, selectedIds),
+  conferenceImport: (options: unknown) => ipcRenderer.invoke('conference:import', options),
 };
 
 contextBridge.exposeInMainWorld('api', api);

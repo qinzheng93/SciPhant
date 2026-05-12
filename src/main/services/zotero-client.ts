@@ -36,7 +36,6 @@ export interface CreateItemPayload {
   title: string;
   abstractNote: string;
   date: string;
-  DOI: string;
   url: string;
   extra: string;
   repository: string;

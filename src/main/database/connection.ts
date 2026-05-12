@@ -7,17 +7,24 @@ import { join, dirname } from 'path';
 // __dirname at runtime = dist/main/database/, project root = two levels up
 const MIGRATIONS_DIR = join(__dirname, 'migrations');
 
-const MIGRATION_FILES = [
+export const ARXIV_MIGRATIONS = [
   { name: '001_initial', filename: '001_initial.sql' },
-  { name: '002_zotero_import', filename: '002_zotero_import.sql' },
+];
+
+export const CONFERENCE_MIGRATIONS = [
+  { name: '003_conference', filename: '003_conference.sql' },
 ];
 
 export class Database {
   private db: SqlJsDatabase | null = null;
   private dbPath: string;
+  private migrations: { name: string; filename: string }[];
+  private skipSchemaUpdates: boolean;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, migrations?: { name: string; filename: string }[]) {
     this.dbPath = dbPath;
+    this.migrations = migrations ?? ARXIV_MIGRATIONS;
+    this.skipSchemaUpdates = migrations !== undefined;
   }
 
   async init(): Promise<void> {
@@ -52,7 +59,7 @@ export class Database {
       )
     `);
 
-    for (const migration of MIGRATION_FILES) {
+    for (const migration of this.migrations) {
       const alreadyApplied = this.db
         .exec('SELECT 1 FROM _migrations WHERE name = ?', [migration.name]);
       if (!alreadyApplied || alreadyApplied.length === 0) {
@@ -73,8 +80,10 @@ export class Database {
       }
     }
 
-    // Runtime schema updates for existing databases
-    this.runSchemaUpdates();
+    // Runtime schema updates for existing databases (arXiv only)
+    if (!this.skipSchemaUpdates) {
+      this.runSchemaUpdates();
+    }
   }
 
   private runSchemaUpdates(): void {

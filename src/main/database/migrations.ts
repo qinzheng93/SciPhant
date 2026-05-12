@@ -4,10 +4,8 @@ import * as fsSync from 'fs';
 import type { Database } from './connection';
 import type { SettingsDb } from './settings';
 import type { PaperTopicsDb } from './paper-topics';
-import type { ConferenceAnalysesDb } from './conference-analyses';
 import { writeAnalysisFile } from '../services/analysis-files';
 import { ARXIV_CATEGORY } from '../commands/arxiv-summary';
-import { getCategoryForConference } from '../commands/conference-summary';
 
 /**
  * Migrate database files from old app name directory ("arXiv Daily") to current userData.
@@ -19,7 +17,7 @@ export function migrateFromOldAppData(): void {
   if (oldPath === newPath) return;
   if (!fsSync.existsSync(oldPath)) return;
 
-  const dataFiles = ['arxiv_papers.db', 'conference_analyses.db', 'settings.db', 'paper_topics.db'];
+  const dataFiles = ['arxiv_papers.db', 'settings.db', 'paper_topics.db'];
   let migrated = false;
 
   for (const file of dataFiles) {
@@ -149,8 +147,8 @@ export function migrateToSplitDatabases(
  */
 export async function migrateAnalysesToFiles(
   arxivDb: Database,
-  conferenceAnalysesDb: ConferenceAnalysesDb | null,
-  conferenceDb: Database | null,
+  _conferenceAnalysesDb: null,
+  _conferenceDb: Database | null,
   dataDir: string,
 ): Promise<boolean> {
   const sqlDb = arxivDb.getDb();
@@ -158,70 +156,38 @@ export async function migrateAnalysesToFiles(
   // Check if migration needed: does arxiv_papers.db have an analyses table?
   const tableCheck = sqlDb.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='analyses'");
   const hasAnalysesTable = tableCheck.length > 0 && tableCheck[0].values.length > 0;
-  const hasConferenceAnalyses = conferenceAnalysesDb !== null;
 
-  if (!hasAnalysesTable && !hasConferenceAnalyses) return false;
+  if (!hasAnalysesTable) return false;
 
   // Migrate arXiv analyses
-  if (hasAnalysesTable) {
-    const rows = sqlDb.exec('SELECT paper_id, summary, analysis FROM analyses');
-    if (rows.length > 0) {
-      let summaryCount = 0;
-      let analysisCount = 0;
-      for (const row of rows[0].values) {
-        const paperId = row[0] as string;
-        const summary = row[1] as string;
-        const analysis = row[2] as string;
+  const rows = sqlDb.exec('SELECT paper_id, summary, analysis FROM analyses');
+  if (rows.length > 0) {
+    let summaryCount = 0;
+    let analysisCount = 0;
+    for (const row of rows[0].values) {
+      const paperId = row[0] as string;
+      const summary = row[1] as string;
+      const analysis = row[2] as string;
 
-        if (summary) {
-          if (!summary.startsWith('SUMMARY_FAILED:') && summary !== 'null') {
-            await writeAnalysisFile(dataDir, 'summaries', ARXIV_CATEGORY, paperId, summary);
-            summaryCount++;
-          }
-        }
-        if (analysis) {
-          await writeAnalysisFile(dataDir, 'analyses', ARXIV_CATEGORY, paperId, analysis);
-          analysisCount++;
+      if (summary) {
+        if (!summary.startsWith('SUMMARY_FAILED:') && summary !== 'null') {
+          await writeAnalysisFile(dataDir, 'summaries', ARXIV_CATEGORY, paperId, summary);
+          summaryCount++;
         }
       }
-      console.log(`[migration] Migrated ${summaryCount} arXiv summaries, ${analysisCount} arXiv analyses to files`);
-    }
-
-    // Drop analyses table from arxiv_papers.db
-    try {
-      sqlDb.run('DROP TABLE analyses');
-      console.log('[migration] Dropped analyses table from arxiv db');
-    } catch { /* ignore */ }
-  }
-
-  // Migrate conference analyses
-  if (hasConferenceAnalyses && conferenceDb) {
-    const sqlAnalysesDb = conferenceAnalysesDb.getDb();
-    const rows = sqlAnalysesDb.exec('SELECT paper_id, summary, analysis FROM analyses');
-    if (rows.length > 0) {
-      let summaryCount = 0;
-      let analysisCount = 0;
-      for (const row of rows[0].values) {
-        const paperId = row[0] as string;
-        const summary = row[1] as string;
-        const analysis = row[2] as string;
-        const category = getCategoryForConference(conferenceDb.getDb(), paperId);
-        if (!category) continue;
-
-        if (summary) {
-          if (!summary.startsWith('SUMMARY_FAILED:')) {
-            await writeAnalysisFile(dataDir, 'summaries', category, paperId, summary);
-            summaryCount++;
-          }
-        }
-        if (analysis) {
-          await writeAnalysisFile(dataDir, 'analyses', category, paperId, analysis);
-          analysisCount++;
-        }
+      if (analysis) {
+        await writeAnalysisFile(dataDir, 'analyses', ARXIV_CATEGORY, paperId, analysis);
+        analysisCount++;
       }
-      console.log(`[migration] Migrated ${summaryCount} conference summaries, ${analysisCount} conference analyses to files`);
     }
+    console.log(`[migration] Migrated ${summaryCount} arXiv summaries, ${analysisCount} arXiv analyses to files`);
   }
+
+  // Drop analyses table from arxiv_papers.db
+  try {
+    sqlDb.run('DROP TABLE analyses');
+    console.log('[migration] Dropped analyses table from arxiv db');
+  } catch { /* ignore */ }
 
   return true;
 }

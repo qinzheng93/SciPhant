@@ -12,8 +12,7 @@ import {
   listCategories,
   saveCategory,
   deleteCategory,
-  clearData,
-  clearAnalyses,
+  clearAllData,
   loadDataDir,
   saveDataDir,
   resetDataDir,
@@ -41,12 +40,6 @@ CREATE TABLE IF NOT EXISTS categories (
   name TEXT NOT NULL UNIQUE,
   enabled BOOLEAN DEFAULT TRUE
 );
-CREATE TABLE IF NOT EXISTS analyses (
-  paper_id TEXT PRIMARY KEY,
-  summary TEXT DEFAULT '',
-  analysis TEXT DEFAULT '',
-  FOREIGN KEY (paper_id) REFERENCES papers(id)
-);
 `;
 
 const SETTINGS_SCHEMA = `
@@ -68,6 +61,37 @@ CREATE TABLE IF NOT EXISTS arxiv_paper_topics (
   topic_id INTEGER NOT NULL,
   PRIMARY KEY (paper_id, topic_id)
 );
+CREATE TABLE IF NOT EXISTS conference_paper_topics (
+  paper_id TEXT NOT NULL,
+  topic_id INTEGER NOT NULL,
+  PRIMARY KEY (paper_id, topic_id)
+);
+`;
+
+const CONFERENCE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS conferences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  short_name TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  full_name TEXT,
+  location TEXT,
+  published_date TEXT,
+  UNIQUE(short_name, year)
+);
+CREATE TABLE IF NOT EXISTS papers (
+  id TEXT PRIMARY KEY,
+  conference_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  authors TEXT NOT NULL DEFAULT '[]',
+  abstract TEXT,
+  pdf_url TEXT,
+  supp_url TEXT,
+  arxiv_url TEXT,
+  bibtex TEXT,
+  pages TEXT,
+  track TEXT,
+  detail_url TEXT
+);
 `;
 
 function createDb(): SqlJsDatabase {
@@ -79,6 +103,7 @@ describe('config commands', () => {
   let db: SqlJsDatabase;
   let settingsDb: SqlJsDatabase;
   let topicsDb: SqlJsDatabase;
+  let conferenceDb: SqlJsDatabase;
 
   beforeAll(async () => {
     SQL = await initSqlJs({
@@ -94,6 +119,8 @@ describe('config commands', () => {
     settingsDb.run(SETTINGS_SCHEMA);
     topicsDb = createDb();
     topicsDb.run(TOPICS_SCHEMA);
+    conferenceDb = createDb();
+    conferenceDb.run(CONFERENCE_SCHEMA);
   });
 
   describe('loadLLMConfig', () => {
@@ -279,27 +306,41 @@ describe('config commands', () => {
     });
   });
 
-  describe('clearData', () => {
-    it('clears papers and analyses', () => {
+  describe('clearAllData', () => {
+    it('clears all data across all databases', () => {
+      // Seed arxiv data
       db.run("INSERT INTO papers VALUES ('1', 'T', '[]', '', '', '', '', '', '[]', '')");
-      db.run("INSERT INTO analyses VALUES ('1', 'Summary', 'Analysis')");
+      db.run("INSERT INTO categories (name, enabled) VALUES ('cs.AI', 1)");
 
-      clearData(db);
+      // Seed conference data
+      conferenceDb.run("INSERT INTO conferences (id, short_name, year, full_name) VALUES (1, 'CVPR', 2025, 'CVPR 2025')");
+      conferenceDb.run("INSERT INTO papers (id, conference_id, title, authors, abstract) VALUES ('p1', 1, 'Test', '[]', 'abs')");
 
+      // Seed topics
+      topicsDb.run("INSERT INTO topics (name, keywords, enabled) VALUES ('AI', '[\"ai\"]', 1)");
+      topicsDb.run("INSERT INTO arxiv_paper_topics VALUES ('1', 1)");
+      topicsDb.run("INSERT INTO conference_paper_topics VALUES ('p1', 1)");
+
+      // Seed settings
+      settingsDb.run("INSERT INTO app_config VALUES ('llm.api_key', 'sk-test')");
+
+      clearAllData(db, conferenceDb, settingsDb, topicsDb);
+
+      // Verify arxiv cleared
       expect(db.exec("SELECT COUNT(*) FROM papers")[0].values[0][0]).toBe(0);
-      expect(db.exec("SELECT COUNT(*) FROM analyses")[0].values[0][0]).toBe(0);
-    });
-  });
+      expect(db.exec("SELECT COUNT(*) FROM categories")[0].values[0][0]).toBe(0);
 
-  describe('clearAnalyses', () => {
-    it('clears only analyses, keeps papers', () => {
-      db.run("INSERT INTO papers VALUES ('1', 'T', '[]', '', '', '', '', '', '[]', '')");
-      db.run("INSERT INTO analyses VALUES ('1', 'Summary', 'Analysis')");
+      // Verify conference cleared
+      expect(conferenceDb.exec("SELECT COUNT(*) FROM papers")[0].values[0][0]).toBe(0);
+      expect(conferenceDb.exec("SELECT COUNT(*) FROM conferences")[0].values[0][0]).toBe(0);
 
-      clearAnalyses(db);
+      // Verify topics cleared
+      expect(topicsDb.exec("SELECT COUNT(*) FROM topics")[0].values[0][0]).toBe(0);
+      expect(topicsDb.exec("SELECT COUNT(*) FROM arxiv_paper_topics")[0].values[0][0]).toBe(0);
+      expect(topicsDb.exec("SELECT COUNT(*) FROM conference_paper_topics")[0].values[0][0]).toBe(0);
 
-      expect(db.exec("SELECT COUNT(*) FROM papers")[0].values[0][0]).toBe(1);
-      expect(db.exec("SELECT COUNT(*) FROM analyses")[0].values[0][0]).toBe(0);
+      // Verify settings cleared
+      expect(settingsDb.exec("SELECT COUNT(*) FROM app_config")[0].values[0][0]).toBe(0);
     });
   });
 

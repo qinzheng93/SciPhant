@@ -16,6 +16,9 @@ import * as rebuildConferenceTopics from './commands/rebuild-conference-topics';
 import * as conferencePaperCmd from './commands/conference-paper';
 import * as conferenceSummaryCmd from './commands/conference-summary';
 import * as conferenceAnalysisCmd from './commands/conference-analysis';
+import * as conferenceImportCmd from './commands/conference-import';
+import initSqlJs from 'sql.js';
+import * as fsSync from 'fs';
 import { ensurePdfDownloaded, getPdfPath } from './services/pdf-extractor';
 import { fetchCollections, createItem, createChildItems, type ChildItemPayload } from './services/zotero-client';
 import { loadZoteroConfig, saveDataDir, resetDataDir } from './commands/config';
@@ -42,14 +45,14 @@ function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
 }
 
 export function registerIpcHandlers(
-  db: Database,
+  arxivDb: Database,
   conferenceDb: Database,
   settingsDb: SettingsDb,
   paperTopicsDb: PaperTopicsDb,
   dataDir: string,
   mainWindow: BrowserWindow,
 ): void {
-  const sqlDb = db.getDb();
+  const sqlArxivDb = arxivDb.getDb();
   const sqlConferenceDb = conferenceDb.getDb();
   const sqlSettingsDb = settingsDb.getDb();
   const sqlPaperTopicsDb = paperTopicsDb.getDb();
@@ -62,8 +65,8 @@ export function registerIpcHandlers(
   };
 
   // Paper (read-only)
-  handle('arxiv:list-papers', async (params) => arxivPaperCmd.listArxivPapers(sqlDb, sqlPaperTopicsDb, params));
-  handle('arxiv:list-fetch-dates', async () => arxivPaperCmd.listArxivFetchDates(sqlDb));
+  handle('arxiv:list-papers', async (params) => arxivPaperCmd.listArxivPapers(sqlArxivDb, sqlPaperTopicsDb, params));
+  handle('arxiv:list-fetch-dates', async () => arxivPaperCmd.listArxivFetchDates(sqlArxivDb));
   handle('arxiv:check-papers-summary-status', async (paperIds: string[]) => checkArxivSummaryStatus(dataDir, paperIds));
   handle('arxiv:get-paper-summary', async (paperId: string) => getArxivSummaryContent(dataDir, paperId));
 
@@ -74,7 +77,7 @@ export function registerIpcHandlers(
       const result = configCmd.saveTopic(sqlPaperTopicsDb, topic);
       const topicId = result.id;
       await enqueueTopicUpdate(() => {
-        rebuildArxivTopics.updateArxivTopicAssociations(sqlDb, sqlPaperTopicsDb, topicId);
+        rebuildArxivTopics.updateArxivTopicAssociations(sqlArxivDb, sqlPaperTopicsDb, topicId);
         rebuildConferenceTopics.updateConferenceTopicAssociations(sqlConferenceDb, sqlPaperTopicsDb, topicId);
         paperTopicsDb.save();
       });
@@ -97,7 +100,7 @@ export function registerIpcHandlers(
   });
   handle('rebuild-paper-topics', async () => {
     await enqueueTopicUpdate(() => {
-      rebuildArxivTopics.rebuildArxivPaperTopics(sqlDb, sqlPaperTopicsDb);
+      rebuildArxivTopics.rebuildArxivPaperTopics(sqlArxivDb, sqlPaperTopicsDb);
       rebuildConferenceTopics.rebuildConferencePaperTopics(sqlConferenceDb, sqlPaperTopicsDb);
       paperTopicsDb.save();
     });
@@ -108,20 +111,23 @@ export function registerIpcHandlers(
     configCmd.updateConfig(sqlSettingsDb, config.llm, config.output, config.zotero, config.theme);
     await settingsDb.save();
   });
-  handle('list-categories', async () => configCmd.listCategories(sqlDb));
+  handle('list-categories', async () => configCmd.listCategories(sqlArxivDb));
   handle('save-category', async (category) => {
-    const result = configCmd.saveCategory(sqlDb, category);
-    await db.save();
+    const result = configCmd.saveCategory(sqlArxivDb, category);
+    await arxivDb.save();
     return result;
   });
   handle('delete-category', async (categoryId) => {
-    configCmd.deleteCategory(sqlDb, categoryId);
-    await db.save();
+    configCmd.deleteCategory(sqlArxivDb, categoryId);
+    await arxivDb.save();
   });
   handle('clear-data', async () => {
-    const result = configCmd.clearData(sqlDb);
+    const result = configCmd.clearAllData(sqlArxivDb, sqlConferenceDb, sqlSettingsDb, sqlPaperTopicsDb);
     await clearAllAnalysisFiles(dataDir);
-    await db.save();
+    await arxivDb.save();
+    await conferenceDb.save();
+    await settingsDb.save();
+    await paperTopicsDb.save();
     return result;
   });
 
@@ -156,30 +162,28 @@ export function registerIpcHandlers(
     return { success: true };
   });
   handle('clear-analyses', async () => {
-    const result = configCmd.clearAnalyses(sqlDb);
     await clearAllAnalysisFiles(dataDir);
-    await db.save();
-    return result;
+    return { success: true };
   });
   handle('test-zotero-connection', async () => configCmd.testZoteroConnection(sqlSettingsDb));
 
   // Fetch
   handle('arxiv:fetch-papers', async (categories) => {
-    const result = await arxivFetchCmd.fetchArxivPapers(sqlDb, sqlPaperTopicsDb, categories || []);
-    await db.save();
+    const result = await arxivFetchCmd.fetchArxivPapers(sqlArxivDb, sqlPaperTopicsDb, categories || []);
+    await arxivDb.save();
     await paperTopicsDb.save();
     return result;
   });
   handle('arxiv:fetch-papers-this-week', async (categories) => {
-    const result = await arxivFetchCmd.fetchArxivPapersThisWeek(sqlDb, sqlPaperTopicsDb, categories || []);
-    await db.save();
+    const result = await arxivFetchCmd.fetchArxivPapersThisWeek(sqlArxivDb, sqlPaperTopicsDb, categories || []);
+    await arxivDb.save();
     await paperTopicsDb.save();
     return result;
   });
   ipcMain.handle('arxiv:fetch-papers-by-date', async (_event, params) => {
     try {
-      const result = await arxivFetchCmd.fetchArxivPapersByDate(sqlDb, sqlPaperTopicsDb, params);
-      await db.save();
+      const result = await arxivFetchCmd.fetchArxivPapersByDate(sqlArxivDb, sqlPaperTopicsDb, params);
+      await arxivDb.save();
       await paperTopicsDb.save();
       return result;
     } catch (err) {
@@ -202,8 +206,8 @@ export function registerIpcHandlers(
     const controller = new AbortController();
     arxivSummaryCmd.setArxivSummaryAbortController(controller);
     try {
-      const result = await arxivSummaryCmd.summarizeArxivPaper(sqlDb, sqlSettingsDb, sqlPaperTopicsDb, dataDir, paperId, skipIfAnalyzed, controller.signal);
-      await db.save();
+      const result = await arxivSummaryCmd.summarizeArxivPaper(sqlArxivDb, sqlSettingsDb, sqlPaperTopicsDb, dataDir, paperId, skipIfAnalyzed, controller.signal);
+      await arxivDb.save();
       await paperTopicsDb.save();
       return result;
     } catch (err) {
@@ -220,7 +224,7 @@ export function registerIpcHandlers(
 
   // PDF download
   handle('arxiv:download-pdf', async (paperId) => {
-    const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
+    const results = sqlArxivDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) {
       throw new Error(`Paper ${paperId} not found`);
     }
@@ -235,7 +239,7 @@ export function registerIpcHandlers(
   });
 
   handle('arxiv:open-pdf', async (paperId) => {
-    const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
+    const results = sqlArxivDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) return;
     const pdfUrl = results[0].values[0][0] as string;
     if (!pdfUrl) return;
@@ -244,7 +248,7 @@ export function registerIpcHandlers(
   });
 
   handle('arxiv:is-pdf-cached', async (paperId) => {
-    const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
+    const results = sqlArxivDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) return false;
     const pdfUrl = results[0].values[0][0] as string;
     if (!pdfUrl) return false;
@@ -258,7 +262,7 @@ export function registerIpcHandlers(
   });
 
   handle('arxiv:delete-pdf', async (paperId) => {
-    const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
+    const results = sqlArxivDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) return;
     const pdfUrl = results[0].values[0][0] as string;
     if (!pdfUrl) return;
@@ -281,7 +285,7 @@ export function registerIpcHandlers(
     const controller = new AbortController();
     arxivAnalysisCmd.setArxivAnalysisAbortController(controller);
     try {
-      const result = await arxivAnalysisCmd.analyzeArxivFullPaper(sqlDb, sqlSettingsDb, dataDir, paperId, controller.signal, (phase) => {
+      const result = await arxivAnalysisCmd.analyzeArxivFullPaper(sqlArxivDb, sqlSettingsDb, dataDir, paperId, controller.signal, (phase) => {
         mainWindow.webContents.send('analysis-progress', phase);
       });
       return result;
@@ -313,8 +317,8 @@ export function registerIpcHandlers(
       throw new Error('Zotero API Key 和 User ID 未配置');
     }
     // Fetch paper from DB
-    const results = sqlDb.exec(
-      'SELECT id, title, authors, abstract_text, url, pdf_url, doi, published_date, categories FROM papers WHERE id = ?',
+    const results = sqlArxivDb.exec(
+      'SELECT id, title, authors, abstract_text, url, pdf_url, published_date, categories FROM papers WHERE id = ?',
       [paperId],
     );
     if (results.length === 0 || results[0].values.length === 0) {
@@ -331,9 +335,8 @@ export function registerIpcHandlers(
     // Strip version suffix from arXiv ID (e.g. "2401.12345v2" → "2401.12345")
     const arxivId = (row[0] as string).replace(/v\d+$/, '');
     const pdfUrl = (row[5] as string) || '';
-    const doi = (row[6] as string) || '';
-    const publishedDate = (row[7] as string) || '';
-    const categories: string[] = JSON.parse(row[8] as string);
+    const publishedDate = (row[6] as string) || '';
+    const categories: string[] = JSON.parse(row[7] as string);
 
     // 1. Create main item
     const arxivRef = `arXiv:${arxivId}`;
@@ -346,7 +349,6 @@ export function registerIpcHandlers(
       title: row[1] as string,
       abstractNote: (row[3] as string) || '',
       date: publishedDate,
-      DOI: doi,
       url: ((row[4] as string) || '').replace(/v\d+$/, ''),
       repository: 'arXiv',
       archiveID: arxivRef,
@@ -408,7 +410,7 @@ export function registerIpcHandlers(
   // Conference papers (read-only from bundled DB)
   handle('conference:list-conferences', async () => conferencePaperCmd.listConferences(sqlConferenceDb));
   handle('conference:list-papers', async (params) =>
-    conferencePaperCmd.listConferencePapers(sqlConferenceDb, sqlDb, sqlPaperTopicsDb, params),
+    conferencePaperCmd.listConferencePapers(sqlConferenceDb, sqlArxivDb, sqlPaperTopicsDb, params),
   );
   handle('conference:check-papers-summary-status', async (paperIds: string[]) =>
     checkConferenceSummaryStatus(sqlConferenceDb, dataDir, paperIds),
@@ -553,7 +555,6 @@ export function registerIpcHandlers(
       title: row[1] as string,
       abstractNote: (row[3] as string) || '',
       date: String(year),
-      DOI: '',
       url: detailUrl,
       proceedingsTitle: fullName,
       conferenceName: `${shortName} ${year}`,
@@ -603,7 +604,79 @@ export function registerIpcHandlers(
     return { success: true, itemKey };
   });
 
-  // Dialog
+  // Conference import
+  handle('conference:read-import-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      title: '选择会议数据库文件',
+      filters: [{ name: '数据库', extensions: ['db'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const filePath = result.filePaths[0];
+
+    const SQL = await initSqlJs({ locateFile: (file: string) => join(__dirname, 'wasm', file) });
+    const buffer = await fs.readFile(filePath);
+    const sourceDb = new SQL.Database(buffer);
+
+    try {
+      const issues = conferenceImportCmd.validateConferenceSchema(sourceDb);
+      if (conferenceImportCmd.hasSchemaIssues(issues)) {
+        return { filePath, valid: false, issues };
+      }
+      const conferences = conferenceImportCmd.listSourceConferences(sourceDb);
+      return { filePath, valid: true, conferences };
+    } finally {
+      sourceDb.close();
+    }
+  });
+
+  handle('conference:check-conflicts', async (filePath: string, selectedIds: number[]) => {
+    const SQL = await initSqlJs({ locateFile: (file: string) => join(__dirname, 'wasm', file) });
+    const buffer = await fs.readFile(filePath);
+    const sourceDb = new SQL.Database(buffer);
+
+    try {
+      let conferences = conferenceImportCmd.listSourceConferences(sourceDb);
+      const idSet = new Set(selectedIds);
+      conferences = conferences.filter(c => idSet.has(c.id));
+      const conflicts = conferenceImportCmd.findConflicts(sqlConferenceDb, conferences);
+      return conflicts;
+    } finally {
+      sourceDb.close();
+    }
+  });
+
+  handle('conference:import', async (options: { filePath: string; resolutions: conferenceImportCmd.ConflictResolution[]; selectedConferenceIds?: number[] }) => {
+    const dbPath = join(dataDir, 'conference_papers.db');
+    let backupPath: string | null = null;
+
+    try {
+      if (fsSync.existsSync(dbPath)) {
+        backupPath = await conferenceImportCmd.backupConferenceDb(dbPath);
+      }
+
+      const result = await conferenceImportCmd.importFromExternalDb(
+        options.filePath, sqlConferenceDb, options.resolutions, dataDir, options.selectedConferenceIds,
+      );
+
+      if (result.success) {
+        await conferenceDb.save();
+        rebuildConferenceTopics.rebuildConferencePaperTopics(sqlConferenceDb, sqlPaperTopicsDb);
+        await paperTopicsDb.save();
+        if (backupPath) await conferenceImportCmd.removeBackup(backupPath);
+      } else {
+        if (backupPath) await conferenceImportCmd.restoreConferenceDb(backupPath, dbPath);
+      }
+
+      return result;
+    } catch (err) {
+      if (backupPath) {
+        try { await conferenceImportCmd.restoreConferenceDb(backupPath, dbPath); } catch {}
+      }
+      throw err;
+    }
+  });
+
   handle('open-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory'],

@@ -50,10 +50,11 @@
   --panel-list-bg: #ffffff;
   --card-border: #e5e7eb;
   --card-hover: #f9fafb;
-  --tag-active-text: #2563eb;
+  --tag-active-text: #374151;
   --tag-bg: transparent;
   --tag-active-bg: #f3f4f6;
   --category-bg: #f3f4f6;
+  --overlay: rgba(0, 0, 0, 0.4);
   --card-selected: #dbeafe;
   --card-selected-text: #374151;
   --nav-active: #bfdbfe;
@@ -517,6 +518,7 @@
   --tag-bg: transparent;
   --tag-active-bg: #3a3a3a;
   --category-bg: #4a4a4a;
+  --overlay: rgba(0, 0, 0, 0.5);
   --card-selected: #2a6adb;
   --card-selected-text: #b0b0b0;
   --nav-active: #2a6adb;

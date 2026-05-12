@@ -305,19 +305,31 @@ export function deleteCategory(db: SqlJsDatabase, categoryId: number): void {
 }
 
 /**
- * Clear all paper data, keep user config (topics, categories, app_config).
+ * Clear ALL data: papers, categories, topics, conferences, settings.
+ * Returns the list of SQL operations performed (for saving the correct DBs).
  */
-export function clearData(db: SqlJsDatabase): { success: boolean } {
-  db.run('DELETE FROM analyses');
-  db.run('DELETE FROM papers');
-  return { success: true };
-}
+export function clearAllData(
+  arxivDb: SqlJsDatabase,
+  conferenceDb: SqlJsDatabase,
+  settingsDb: SqlJsDatabase,
+  paperTopicsDb: SqlJsDatabase,
+): { success: boolean } {
+  // arxiv_papers.db
+  arxivDb.run('DELETE FROM papers');
+  arxivDb.run('DELETE FROM categories');
 
-/**
- * Clear only analysis data, keep papers.
- */
-export function clearAnalyses(db: SqlJsDatabase): { success: boolean } {
-  db.run('DELETE FROM analyses');
+  // conference_papers.db
+  conferenceDb.run('DELETE FROM papers');
+  conferenceDb.run('DELETE FROM conferences');
+
+  // paper_topics.db
+  paperTopicsDb.run('DELETE FROM arxiv_paper_topics');
+  paperTopicsDb.run('DELETE FROM conference_paper_topics');
+  paperTopicsDb.run('DELETE FROM topics');
+
+  // settings.db
+  settingsDb.run('DELETE FROM app_config');
+
   return { success: true };
 }
 

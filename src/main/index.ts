@@ -1,7 +1,6 @@
 import { app, BrowserWindow, shell, Menu } from 'electron';
 import { join } from 'path';
-import { Database } from './database/connection';
-import { ConferenceAnalysesDb } from './database/conference-analyses';
+import { Database, CONFERENCE_MIGRATIONS } from './database/connection';
 import { SettingsDb } from './database/settings';
 import { PaperTopicsDb } from './database/paper-topics';
 import { migrateFromOldAppData, migrateToSplitDatabases, migrateAnalysesToFiles } from './database/migrations';
@@ -9,15 +8,15 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { loadDataDir } from './commands/config';
 
 let mainWindow: BrowserWindow | null = null;
-let db: Database | null = null;
+let arxivDb: Database | null = null;
 let conferenceDb: Database | null = null;
 let settingsDb: SettingsDb | null = null;
 let paperTopicsDb: PaperTopicsDb | null = null;
 
 app.on('before-quit', async () => {
-  if (db) {
-    await db.close();
-    db = null;
+  if (arxivDb) {
+    await arxivDb.close();
+    arxivDb = null;
   }
   if (settingsDb) {
     await settingsDb.close();
@@ -27,7 +26,6 @@ app.on('before-quit', async () => {
     await paperTopicsDb.close();
     paperTopicsDb = null;
   }
-  // conferenceDb is read-only, no save needed
   if (conferenceDb) {
     conferenceDb.getDb().close();
     conferenceDb = null;
@@ -110,42 +108,31 @@ app.whenReady().then(async () => {
   const dataDir = loadDataDir(settingsDb.getDb());
 
   // Step 3: Initialize data databases at custom (or default) dataDir
-  db = new Database(join(dataDir, 'arxiv_papers.db'));
-  await db.init();
+  arxivDb = new Database(join(dataDir, 'arxiv_papers.db'));
+  await arxivDb.init();
 
-  const conferenceDbPath = app.isPackaged
-    ? join(process.resourcesPath, 'conference_papers.db')
-    : join(app.getAppPath(), 'resources', 'conference_papers.db');
-  conferenceDb = await Database.fromReadOnlyFile(conferenceDbPath, join(__dirname, 'wasm'));
+  conferenceDb = new Database(join(dataDir, 'conference_papers.db'), CONFERENCE_MIGRATIONS);
+  await conferenceDb.init();
 
   paperTopicsDb = new PaperTopicsDb(join(dataDir, 'paper_topics.db'));
   await paperTopicsDb.init();
 
   // Step 4: Migrate schema data (topics, config) from arxiv_papers.db to split databases
-  const migrated = migrateToSplitDatabases(db, settingsDb, paperTopicsDb);
+  const migrated = migrateToSplitDatabases(arxivDb, settingsDb, paperTopicsDb);
   if (migrated) {
     await settingsDb.save();
     await paperTopicsDb.save();
-    await db.save();
+    await arxivDb.save();
   }
 
   // Step 5: Migrate analyses from SQL to markdown files
-  const confAnalysesPath = join(dataDir, 'conference_analyses.db');
   const { existsSync } = await import('fs');
-  let conferenceAnalysesDb: ConferenceAnalysesDb | null = null;
-  if (existsSync(confAnalysesPath)) {
-    conferenceAnalysesDb = new ConferenceAnalysesDb(confAnalysesPath);
-    await conferenceAnalysesDb.init();
-  }
-  const analysesMigrated = await migrateAnalysesToFiles(db, conferenceAnalysesDb, conferenceDb, dataDir);
+  const analysesMigrated = await migrateAnalysesToFiles(arxivDb, null, conferenceDb, dataDir);
   if (analysesMigrated) {
-    await db.save();
-  }
-  if (conferenceAnalysesDb) {
-    await conferenceAnalysesDb.close();
+    await arxivDb.save();
   }
 
-  registerIpcHandlers(db, conferenceDb, settingsDb, paperTopicsDb, dataDir, createWindow());
+  registerIpcHandlers(arxivDb, conferenceDb, settingsDb, paperTopicsDb, dataDir, createWindow());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

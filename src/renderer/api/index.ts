@@ -296,3 +296,60 @@ export const conferenceDeleteAnalysis = async (paperId: string): Promise<void> =
 export const conferenceExportToZotero = async (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string): Promise<{ success: boolean; itemKey: string }> => {
   return window.api.conferenceExportToZotero(paperId, collectionKey, summaryHtml, analysisHtml)
 }
+
+// Conference import
+export interface SchemaIssue {
+  missingTables: string[];
+  missingColumns: { table: string; column: string }[];
+  extraColumns: { table: string; column: string }[];
+}
+
+export interface SourceConference {
+  id: number;
+  short_name: string;
+  year: number;
+  full_name: string | null;
+  paper_count: number;
+}
+
+export interface ConflictInfo {
+  source: SourceConference;
+  targetPaperCount: number;
+}
+
+export interface ConflictResolution {
+  short_name: string;
+  year: number;
+  action: 'skip' | 'overwrite_keep_analysis' | 'overwrite_clear_analysis';
+}
+
+export interface ReadImportResult {
+  filePath: string;
+  valid: boolean;
+  issues?: SchemaIssue;
+  conferences?: SourceConference[];
+}
+
+export interface ImportResult {
+  success: boolean;
+  importedConferences: number;
+  importedPapers: number;
+  skippedConferences: number;
+  error?: string;
+}
+
+export const conferenceReadImportFile = async (): Promise<ReadImportResult | null> => {
+  return window.api.conferenceReadImportFile()
+}
+
+export const conferenceCheckConflicts = async (filePath: string, selectedIds: number[]): Promise<ConflictInfo[]> => {
+  return window.api.conferenceCheckConflicts(filePath, selectedIds)
+}
+
+export const conferenceImport = async (options: {
+  filePath: string;
+  resolutions: ConflictResolution[];
+  selectedConferenceIds?: number[];
+}): Promise<ImportResult> => {
+  return window.api.conferenceImport(options)
+}

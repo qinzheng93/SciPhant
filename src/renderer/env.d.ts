@@ -177,6 +177,11 @@ interface ElectronAPI {
   conferenceDeleteSummary: (id: string) => Promise<void>
   conferenceDeleteAnalysis: (id: string) => Promise<void>
   conferenceExportToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => Promise<{ success: boolean; itemKey: string }>
+
+  // Conference import
+  conferenceReadImportFile: () => Promise<any>
+  conferenceCheckConflicts: (filePath: string, selectedIds: number[]) => Promise<any>
+  conferenceImport: (options: unknown) => Promise<any>
 }
 
 interface Window {

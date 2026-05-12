@@ -2,6 +2,11 @@
 *.db
 !resources/conference_papers.db
 *.sqlite
+*-shm
+*-wal
+
+# Vite cache
+.vite/
 
 # Node
 node_modules/
