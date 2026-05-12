@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
 import {
@@ -14,7 +14,14 @@ import {
   deleteCategory,
   clearData,
   clearAnalyses,
+  loadDataDir,
+  saveDataDir,
+  resetDataDir,
 } from '../config';
+
+vi.mock('electron', () => ({
+  app: { getPath: vi.fn(() => '/default/userData') },
+}));
 
 const ARXIV_SCHEMA = `
 CREATE TABLE IF NOT EXISTS papers (
@@ -293,6 +300,51 @@ describe('config commands', () => {
 
       expect(db.exec("SELECT COUNT(*) FROM papers")[0].values[0][0]).toBe(1);
       expect(db.exec("SELECT COUNT(*) FROM analyses")[0].values[0][0]).toBe(0);
+    });
+  });
+
+  describe('loadDataDir', () => {
+    it('returns default when no config exists', () => {
+      expect(loadDataDir(settingsDb)).toBe('/default/userData');
+    });
+
+    it('returns configured directory', () => {
+      settingsDb.run("INSERT INTO app_config VALUES ('data.dir', '/custom/path')");
+      expect(loadDataDir(settingsDb)).toBe('/custom/path');
+    });
+
+    it('returns default when value is empty string', () => {
+      settingsDb.run("INSERT INTO app_config VALUES ('data.dir', '')");
+      expect(loadDataDir(settingsDb)).toBe('/default/userData');
+    });
+  });
+
+  describe('saveDataDir', () => {
+    it('inserts new config', () => {
+      saveDataDir(settingsDb, '/new/path');
+      const rows = settingsDb.exec("SELECT value FROM app_config WHERE key = 'data.dir'");
+      expect(rows[0].values[0][0]).toBe('/new/path');
+    });
+
+    it('updates existing config', () => {
+      settingsDb.run("INSERT INTO app_config VALUES ('data.dir', '/old/path')");
+      saveDataDir(settingsDb, '/new/path');
+      const rows = settingsDb.exec("SELECT value FROM app_config WHERE key = 'data.dir'");
+      expect(rows.length).toBe(1);
+      expect(rows[0].values[0][0]).toBe('/new/path');
+    });
+  });
+
+  describe('resetDataDir', () => {
+    it('deletes existing config', () => {
+      settingsDb.run("INSERT INTO app_config VALUES ('data.dir', '/custom/path')");
+      resetDataDir(settingsDb);
+      const rows = settingsDb.exec("SELECT value FROM app_config WHERE key = 'data.dir'");
+      expect(rows.length).toBe(0);
+    });
+
+    it('does not error when no config exists', () => {
+      expect(() => resetDataDir(settingsDb)).not.toThrow();
     });
   });
 });

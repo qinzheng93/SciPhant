@@ -20,6 +20,11 @@ const api = {
   clearData: () => ipcRenderer.invoke('clear-data'),
   clearAnalyses: () => ipcRenderer.invoke('clear-analyses'),
 
+  // Data directory
+  getDataDir: () => ipcRenderer.invoke('get-data-dir'),
+  setDataDir: () => ipcRenderer.invoke('set-data-dir'),
+  resetDataDir: () => ipcRenderer.invoke('reset-data-dir'),
+
   // Fetch (arXiv)
   fetchArxivPapers: (categories?: string[]) => ipcRenderer.invoke('arxiv:fetch-papers', categories),
   fetchArxivPapersThisWeek: (categories?: string[]) => ipcRenderer.invoke('arxiv:fetch-papers-this-week', categories),

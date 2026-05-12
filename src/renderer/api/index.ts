@@ -186,6 +186,19 @@ export const clearAnalyses = async (): Promise<{ success: boolean }> => {
   return window.api.clearAnalyses()
 }
 
+// Data directory
+export const getDataDir = async (): Promise<string> => {
+  return window.api.getDataDir()
+}
+
+export const setDataDir = async (): Promise<{ success: boolean; error?: string }> => {
+  return window.api.setDataDir()
+}
+
+export const resetDataDir = async (): Promise<{ success: boolean }> => {
+  return window.api.resetDataDir()
+}
+
 // Zotero API
 export interface ZoteroCollection {
   key: string

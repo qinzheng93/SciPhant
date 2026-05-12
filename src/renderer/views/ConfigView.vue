@@ -8,20 +8,7 @@
     </header>
 
     <div class="config-content">
-      <div class="config-section theme-section">
-        <h3 class="section-title">外观设置</h3>
-        <div class="theme-options">
-          <button
-            v-for="option in themeOptions"
-            :key="option.value"
-            class="theme-btn"
-            :class="{ active: configStore.theme === option.value }"
-            @click="configStore.theme = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-      </div>
+      <GeneralSettings />
 
       <CategoryEditor />
       <TopicEditor />
@@ -30,7 +17,7 @@
 
       <div class="danger-zone">
         <h3 class="danger-title">危险操作</h3>
-        <p class="danger-desc">清空所有分析数据，论文和阅读记录不受影响。</p>
+        <p class="setting-hint">清空所有分析数据，论文和阅读记录不受影响。</p>
         <button
           class="btn-danger"
           :class="{ confirming: confirmClearAnalyses }"
@@ -39,7 +26,7 @@
           {{ confirmClearAnalyses ? '再次点击确认' : '清空分析数据' }}
         </button>
         <div class="danger-divider"></div>
-        <p class="danger-desc">清空所有论文数据，包括论文、分析结果和阅读记录。主题和设置不会被删除。</p>
+        <p class="setting-hint">清空所有论文数据，包括论文、分析结果和阅读记录。主题和设置不会被删除。</p>
         <button
           class="btn-danger"
           :class="{ confirming: confirmClearData }"
@@ -60,26 +47,19 @@ import TopicEditor from '../components/config/TopicEditor.vue'
 import CategoryEditor from '../components/config/CategoryEditor.vue'
 import LLMSettings from '../components/config/LLMSettings.vue'
 import ZoteroSettings from '../components/config/ZoteroSettings.vue'
-import { useConfigStore } from '../stores/config'
+import GeneralSettings from '../components/config/GeneralSettings.vue'
 import { usePapersStore } from '../stores/papers'
 import { useToastStore } from '../stores/toast'
 import { clearData, clearAnalyses } from '../api'
 
 const router = useRouter()
 const isMac = (navigator as any).userAgentData?.platform === 'macOS'
-const configStore = useConfigStore()
 const papersStore = usePapersStore()
 const toastStore = useToastStore()
 const confirmClearData = ref(false)
 const confirmClearAnalyses = ref(false)
 let confirmDataTimer: number | null = null
 let confirmAnalysesTimer: number | null = null
-
-const themeOptions: { value: 'light' | 'dark' | 'system'; label: string }[] = [
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'system', label: '跟随系统' },
-]
 
 const clearAllTimers = () => {
   if (confirmDataTimer) { clearTimeout(confirmDataTimer); confirmDataTimer = null }
@@ -201,14 +181,8 @@ const handleClearAnalyses = async () => {
   margin-bottom: 8px;
 }
 
-.danger-desc {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  margin-bottom: 12px;
-}
-
 .btn-danger {
-  padding: 10px 24px;
+  padding: 8px 16px;
   background: var(--card-bg);
   color: var(--color-error);
   border: 1px solid var(--color-error-border);
@@ -238,44 +212,4 @@ const handleClearAnalyses = async () => {
   background: var(--color-error-border);
   margin: 16px 0;
 }
-
-.theme-section {
-  margin-bottom: 20px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
-.theme-options {
-  display: flex;
-  gap: 8px;
-}
-
-.theme-btn {
-  padding: 8px 16px;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  background: var(--card-bg);
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.theme-btn:hover {
-  border-color: var(--border-secondary);
-}
-
-.theme-btn.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-primary-bg);
-}
-
 </style>

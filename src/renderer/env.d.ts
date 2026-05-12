@@ -101,6 +101,11 @@ interface ElectronAPI {
   clearData: () => Promise<{ success: boolean }>
   clearAnalyses: () => Promise<{ success: boolean }>
 
+  // Data directory
+  getDataDir: () => Promise<string>
+  setDataDir: () => Promise<{ success: boolean; error?: string }>
+  resetDataDir: () => Promise<{ success: boolean }>
+
   // Fetch
   fetchArxivPapers: (categories?: string[]) => Promise<{
     success: boolean; new_count: number; existing_count: number

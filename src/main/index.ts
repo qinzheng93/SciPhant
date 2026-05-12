@@ -6,6 +6,7 @@ import { SettingsDb } from './database/settings';
 import { PaperTopicsDb } from './database/paper-topics';
 import { migrateFromOldAppData, migrateToSplitDatabases, migrateAnalysesToFiles } from './database/migrations';
 import { registerIpcHandlers } from './ipc-handlers';
+import { loadDataDir } from './commands/config';
 
 let mainWindow: BrowserWindow | null = null;
 let db: Database | null = null;
@@ -103,8 +104,13 @@ app.whenReady().then(async () => {
   // Step 1: Migrate data files from old app name ("arXiv Daily") directory
   migrateFromOldAppData();
 
-  // Step 2: Initialize all databases
-  db = new Database(join(app.getPath('userData'), 'arxiv_papers.db'));
+  // Step 2: Initialize settings DB first (at default userData) to read custom dataDir
+  settingsDb = new SettingsDb(join(app.getPath('userData'), 'settings.db'));
+  await settingsDb.init();
+  const dataDir = loadDataDir(settingsDb.getDb());
+
+  // Step 3: Initialize data databases at custom (or default) dataDir
+  db = new Database(join(dataDir, 'arxiv_papers.db'));
   await db.init();
 
   const conferenceDbPath = app.isPackaged
@@ -112,13 +118,10 @@ app.whenReady().then(async () => {
     : join(app.getAppPath(), 'resources', 'conference_papers.db');
   conferenceDb = await Database.fromReadOnlyFile(conferenceDbPath, join(__dirname, 'wasm'));
 
-  settingsDb = new SettingsDb(join(app.getPath('userData'), 'settings.db'));
-  await settingsDb.init();
-
-  paperTopicsDb = new PaperTopicsDb(join(app.getPath('userData'), 'paper_topics.db'));
+  paperTopicsDb = new PaperTopicsDb(join(dataDir, 'paper_topics.db'));
   await paperTopicsDb.init();
 
-  // Step 3: Migrate schema data (topics, config) from arxiv_papers.db to split databases
+  // Step 4: Migrate schema data (topics, config) from arxiv_papers.db to split databases
   const migrated = migrateToSplitDatabases(db, settingsDb, paperTopicsDb);
   if (migrated) {
     await settingsDb.save();
@@ -126,16 +129,15 @@ app.whenReady().then(async () => {
     await db.save();
   }
 
-  // Step 4: Migrate analyses from SQL to markdown files
-  // Open conference_analyses.db only if it exists (for migration)
-  const confAnalysesPath = join(app.getPath('userData'), 'conference_analyses.db');
+  // Step 5: Migrate analyses from SQL to markdown files
+  const confAnalysesPath = join(dataDir, 'conference_analyses.db');
   const { existsSync } = await import('fs');
   let conferenceAnalysesDb: ConferenceAnalysesDb | null = null;
   if (existsSync(confAnalysesPath)) {
     conferenceAnalysesDb = new ConferenceAnalysesDb(confAnalysesPath);
     await conferenceAnalysesDb.init();
   }
-  const analysesMigrated = await migrateAnalysesToFiles(db, conferenceAnalysesDb, conferenceDb, app.getPath('userData'));
+  const analysesMigrated = await migrateAnalysesToFiles(db, conferenceAnalysesDb, conferenceDb, dataDir);
   if (analysesMigrated) {
     await db.save();
   }
@@ -143,7 +145,7 @@ app.whenReady().then(async () => {
     await conferenceAnalysesDb.close();
   }
 
-  registerIpcHandlers(db, conferenceDb, settingsDb, paperTopicsDb, createWindow());
+  registerIpcHandlers(db, conferenceDb, settingsDb, paperTopicsDb, dataDir, createWindow());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

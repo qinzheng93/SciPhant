@@ -1,5 +1,5 @@
 <template>
-  <div class="zotero-settings">
+  <div class="config-section">
     <h3>Zotero 设置</h3>
 
     <div class="form-row">
@@ -14,6 +14,7 @@
           v-model="configStore.zoteroConfig.api_key"
           :type="showApiKey ? 'text' : 'password'"
           placeholder="Zotero API Key"
+          class="input-icon-right"
         />
         <button class="toggle-visibility" @click="showApiKey = !showApiKey">
           <Eye v-if="!showApiKey" :size="16" />
@@ -23,7 +24,7 @@
     </div>
 
     <div class="test-row">
-      <button class="btn-test" @click="testConnection" :disabled="testing">
+      <button class="btn-default" @click="testConnection" :disabled="testing">
         {{ testing ? '测试中...' : '测试连接' }}
       </button>
       <span v-if="testResult" :class="testResult.success ? 'test-success' : 'test-error'">
@@ -65,112 +66,3 @@ const testConnection = async () => {
   }
 }
 </script>
-
-<style scoped>
-.zotero-settings {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-.zotero-settings h3 {
-  margin-bottom: 12px;
-  font-size: 16px;
-}
-
-.form-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-  gap: 12px;
-}
-
-.form-row:last-child {
-  margin-bottom: 0;
-}
-
-.form-row label {
-  width: 100px;
-  font-size: 14px;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.form-row input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  font-size: 14px;
-  height: 36px;
-  box-sizing: border-box;
-}
-
-.input-wrapper {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.input-wrapper input {
-  padding-right: 36px;
-}
-
-.toggle-visibility {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  color: var(--text-placeholder);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.toggle-visibility:hover {
-  color: var(--text-tertiary);
-}
-
-.test-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.btn-test {
-  padding: 8px 20px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.btn-test:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-}
-
-.btn-test:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.test-success {
-  color: var(--color-success);
-  font-size: 13px;
-}
-
-.test-error {
-  color: var(--color-error);
-  font-size: 13px;
-}
-</style>

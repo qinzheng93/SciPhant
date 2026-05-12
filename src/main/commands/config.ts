@@ -1,4 +1,5 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
+import { app } from 'electron';
 import type { Topic } from '../services/filter';
 
 export interface LLMConfig {
@@ -84,6 +85,23 @@ export function loadZoteroConfig(settingsDb: SqlJsDatabase): ZoteroConfig {
     if (key === 'zotero.user_id') config.user_id = value;
   }
   return config;
+}
+
+export function loadDataDir(settingsDb: SqlJsDatabase): string {
+  const rows = settingsDb.exec("SELECT value FROM app_config WHERE key = 'data.dir'");
+  if (rows.length > 0 && rows[0].values.length > 0) {
+    const dir = rows[0].values[0][0] as string;
+    if (dir) return dir;
+  }
+  return app.getPath('userData');
+}
+
+export function saveDataDir(settingsDb: SqlJsDatabase, dir: string): void {
+  settingsDb.run("INSERT INTO app_config (key, value) VALUES ('data.dir', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [dir]);
+}
+
+export function resetDataDir(settingsDb: SqlJsDatabase): void {
+  settingsDb.run("DELETE FROM app_config WHERE key = 'data.dir'");
 }
 
 /**

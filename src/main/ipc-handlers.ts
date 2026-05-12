@@ -1,5 +1,6 @@
 import { ipcMain, dialog, app, shell } from 'electron';
 import * as fs from 'fs/promises';
+import { join } from 'path';
 import type { BrowserWindow } from 'electron';
 import type { Database } from './database/connection';
 import type { SettingsDb } from './database/settings';
@@ -17,7 +18,7 @@ import * as conferenceSummaryCmd from './commands/conference-summary';
 import * as conferenceAnalysisCmd from './commands/conference-analysis';
 import { ensurePdfDownloaded, getPdfPath } from './services/pdf-extractor';
 import { fetchCollections, createItem, createChildItems, type ChildItemPayload } from './services/zotero-client';
-import { loadZoteroConfig } from './commands/config';
+import { loadZoteroConfig, saveDataDir, resetDataDir } from './commands/config';
 import {
   deleteAnalysisFile,
   clearAllAnalysisFiles,
@@ -45,13 +46,13 @@ export function registerIpcHandlers(
   conferenceDb: Database,
   settingsDb: SettingsDb,
   paperTopicsDb: PaperTopicsDb,
+  dataDir: string,
   mainWindow: BrowserWindow,
 ): void {
   const sqlDb = db.getDb();
   const sqlConferenceDb = conferenceDb.getDb();
   const sqlSettingsDb = settingsDb.getDb();
   const sqlPaperTopicsDb = paperTopicsDb.getDb();
-  const dataDir = app.getPath('userData');
 
   // Serial queue for topic association updates
   let topicQueueChain = Promise.resolve();
@@ -122,6 +123,37 @@ export function registerIpcHandlers(
     await clearAllAnalysisFiles(dataDir);
     await db.save();
     return result;
+  });
+
+  // Data directory
+  handle('get-data-dir', async () => dataDir);
+  handle('set-data-dir', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: '选择数据目录',
+    });
+    if (result.canceled || result.filePaths.length === 0) return { success: false };
+    const newDir = result.filePaths[0];
+    // Validate writable
+    try {
+      const testFile = join(newDir, '.sciphant-write-test');
+      await fs.writeFile(testFile, 'test');
+      await fs.unlink(testFile);
+    } catch {
+      return { success: false, error: '目录不可写' };
+    }
+    saveDataDir(sqlSettingsDb, newDir);
+    await settingsDb.save();
+    app.relaunch();
+    app.exit(0);
+    return { success: true };
+  });
+  handle('reset-data-dir', async () => {
+    resetDataDir(sqlSettingsDb);
+    await settingsDb.save();
+    app.relaunch();
+    app.exit(0);
+    return { success: true };
   });
   handle('clear-analyses', async () => {
     const result = configCmd.clearAnalyses(sqlDb);
@@ -196,7 +228,7 @@ export function registerIpcHandlers(
     if (!pdfUrl) {
       throw new Error(`Paper ${paperId} has no PDF URL`);
     }
-    const filePath = await ensurePdfDownloaded(pdfUrl, undefined, app.getPath('userData'), (loaded, total) => {
+    const filePath = await ensurePdfDownloaded(pdfUrl, undefined, dataDir, (loaded, total) => {
       mainWindow.webContents.send('pdf-download-progress', { paperId, loaded, total });
     });
     return filePath;
@@ -207,7 +239,7 @@ export function registerIpcHandlers(
     if (results.length === 0 || results[0].values.length === 0) return;
     const pdfUrl = results[0].values[0][0] as string;
     if (!pdfUrl) return;
-    const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+    const localPath = getPdfPath(dataDir, pdfUrl);
     await shell.openPath(localPath);
   });
 
@@ -216,7 +248,7 @@ export function registerIpcHandlers(
     if (results.length === 0 || results[0].values.length === 0) return false;
     const pdfUrl = results[0].values[0][0] as string;
     if (!pdfUrl) return false;
-    const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+    const localPath = getPdfPath(dataDir, pdfUrl);
     try {
       await fs.access(localPath);
       return true;
@@ -230,7 +262,7 @@ export function registerIpcHandlers(
     if (results.length === 0 || results[0].values.length === 0) return;
     const pdfUrl = results[0].values[0][0] as string;
     if (!pdfUrl) return;
-    const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+    const localPath = getPdfPath(dataDir, pdfUrl);
     try {
       await fs.unlink(localPath);
     } catch { /* ignore */ }
@@ -329,7 +361,7 @@ export function registerIpcHandlers(
 
     // 2a. PDF attachment — only if already cached locally
     if (pdfUrl) {
-      const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+      const localPath = getPdfPath(dataDir, pdfUrl);
       try {
         await fs.access(localPath);
         children.push({
@@ -438,7 +470,7 @@ export function registerIpcHandlers(
   handle('conference:download-pdf', async (paperId) => {
     const pdfUrl = conferencePaperCmd.getConferencePaperPdfUrl(sqlConferenceDb, paperId);
     if (!pdfUrl) throw new Error(`Paper ${paperId} has no PDF URL`);
-    const filePath = await ensurePdfDownloaded(pdfUrl, undefined, app.getPath('userData'), (loaded, total) => {
+    const filePath = await ensurePdfDownloaded(pdfUrl, undefined, dataDir, (loaded, total) => {
       mainWindow.webContents.send('pdf-download-progress', { paperId, loaded, total });
     });
     return filePath;
@@ -447,21 +479,21 @@ export function registerIpcHandlers(
   handle('conference:open-pdf', async (paperId) => {
     const pdfUrl = conferencePaperCmd.getConferencePaperPdfUrl(sqlConferenceDb, paperId);
     if (!pdfUrl) return;
-    const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+    const localPath = getPdfPath(dataDir, pdfUrl);
     await shell.openPath(localPath);
   });
 
   handle('conference:is-pdf-cached', async (paperId) => {
     const pdfUrl = conferencePaperCmd.getConferencePaperPdfUrl(sqlConferenceDb, paperId);
     if (!pdfUrl) return false;
-    const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+    const localPath = getPdfPath(dataDir, pdfUrl);
     try { await fs.access(localPath); return true; } catch { return false; }
   });
 
   handle('conference:delete-pdf', async (paperId) => {
     const pdfUrl = conferencePaperCmd.getConferencePaperPdfUrl(sqlConferenceDb, paperId);
     if (!pdfUrl) return;
-    const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+    const localPath = getPdfPath(dataDir, pdfUrl);
     try { await fs.unlink(localPath); } catch { /* ignore */ }
   });
 
@@ -537,7 +569,7 @@ export function registerIpcHandlers(
     const children: ChildItemPayload[] = [];
 
     if (pdfUrl) {
-      const localPath = getPdfPath(app.getPath('userData'), pdfUrl);
+      const localPath = getPdfPath(dataDir, pdfUrl);
       try {
         await fs.access(localPath);
         children.push({

@@ -1,6 +1,7 @@
 <template>
-  <div class="topic-editor">
+  <div class="config-section">
     <h3>主题管理</h3>
+    <p class="setting-hint">通过关键词匹配自动为论文关联主题。</p>
 
     <div class="topics-list">
       <div v-for="topic in configStore.topics" :key="topic.id" class="topic-item">
@@ -15,7 +16,7 @@
           </div>
           <div class="edit-actions">
             <button @click="saveEdit(topic.id)" class="btn-save">保存</button>
-            <button @click="cancelEdit" class="btn-cancel">取消</button>
+            <button @click="cancelEdit" class="btn-default">取消</button>
           </div>
         </div>
         <div v-else class="topic-display">
@@ -24,16 +25,16 @@
             <span class="topic-keywords">{{ topic.keywords.join(', ') }}</span>
           </div>
           <div class="topic-actions">
-            <button @click="startEdit(topic)" class="btn-action">编辑</button>
-            <button @click="deleteTopic(topic.id)" class="btn-action delete">删除</button>
+            <button @click="startEdit(topic)" class="btn-default btn-sm">编辑</button>
+            <button @click="deleteTopic(topic.id)" class="btn-default btn-sm delete">删除</button>
           </div>
         </div>
       </div>
     </div>
 
     <div class="bottom-actions">
-      <button @click="startAdd" class="btn-add">添加主题</button>
-      <button @click="rebuildIndex" class="btn-rebuild">重建索引</button>
+      <button @click="startAdd" class="btn-default">添加主题</button>
+      <button @click="rebuildIndex" class="btn-default">重建索引</button>
     </div>
 
     <!-- Add topic dialog -->
@@ -50,7 +51,7 @@
         </div>
         <div class="edit-actions">
           <button @click="saveNew" class="btn-save">添加</button>
-          <button @click="cancelAdd" class="btn-cancel">取消</button>
+          <button @click="cancelAdd" class="btn-default">取消</button>
         </div>
       </div>
     </div>
@@ -123,185 +124,3 @@ const rebuildIndex = () => {
   configStore.triggerRebuild()
 }
 </script>
-
-<style scoped>
-.topic-editor {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-.topic-editor h3 {
-  margin-bottom: 12px;
-  font-size: 16px;
-}
-
-.topics-list {
-  margin-bottom: 8px;
-}
-
-.topic-item {
-  background: var(--card-bg);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-}
-
-.topic-display {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.topic-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.topic-name {
-  display: block;
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 2px;
-}
-
-.topic-keywords {
-  display: block;
-  font-size: 13px;
-  color: var(--text-tertiary);
-}
-
-.topic-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.btn-action {
-  padding: 6px 14px;
-  background: transparent;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-  color: var(--text-secondary);
-}
-
-.btn-action:hover {
-  background: var(--bg-tertiary);
-}
-
-.btn-action.delete:hover {
-  background: var(--color-error-bg);
-  border-color: var(--color-error-border);
-  color: var(--color-error);
-}
-
-.topic-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.field-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.edit-input {
-  padding: 8px 12px;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  font-size: 14px;
-  height: 36px;
-  box-sizing: border-box;
-}
-
-.edit-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-save,
-.btn-cancel,
-.btn-add,
-.btn-rebuild {
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.btn-save {
-  background: var(--color-primary);
-  color: white;
-  border: none;
-}
-
-.btn-cancel {
-  background: var(--card-bg);
-  border: 1px solid var(--border-primary);
-}
-
-.bottom-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.btn-add {
-  background: var(--card-bg);
-  border: 1px solid var(--border-primary);
-  color: var(--text-secondary);
-}
-
-.btn-add:hover {
-  background: var(--bg-tertiary);
-}
-
-.btn-rebuild {
-  background: var(--card-bg);
-  border: 1px solid var(--border-primary);
-  color: var(--text-secondary);
-}
-
-.btn-rebuild:hover {
-  background: var(--bg-tertiary);
-}
-
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.dialog {
-  background: var(--bg-secondary);
-  border-radius: 10px;
-  padding: 24px;
-  width: 400px;
-  max-width: 90vw;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.dialog-title {
-  margin: 0;
-  font-size: 16px;
-}
-</style>
