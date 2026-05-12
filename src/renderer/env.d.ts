@@ -36,7 +36,7 @@ interface ZoteroConfig {
   user_id: string
 }
 
-interface PaperWithAnalysis {
+interface Paper {
   id: string
   title: string
   authors: string[]
@@ -47,8 +47,6 @@ interface PaperWithAnalysis {
   updated_date: string
   categories: string[]
   fetched_at: string
-  summary?: string | null
-  analysis?: string | null
 }
 
 interface ConferencePaper {
@@ -67,8 +65,6 @@ interface ConferencePaper {
   pages: string | null
   track: string | null
   detail_url: string | null
-  summary: string | null
-  analysis: string | null
 }
 
 interface ConferenceInfo {
@@ -81,16 +77,16 @@ interface ConferenceInfo {
 
 interface ElectronAPI {
   // Paper
-  listPapers: (params: {
+  listArxivPapers: (params: {
     topicIds?: number[]
     search?: string
     fetchDate?: string
     page?: number
     pageSize?: number
-  }) => Promise<{ items: PaperWithAnalysis[]; total: number; page: number; page_size: number }>
-  getPaperDetail: (paperId: string) => Promise<PaperWithAnalysis>
-  listFetchDates: () => Promise<{ date: string; display: string; count: number }[]>
-  listTopicCounts: () => Promise<{ topic_id: number; name: string; count: number }[]>
+  }) => Promise<{ items: Paper[]; total: number; page: number; page_size: number }>
+  listArxivFetchDates: () => Promise<{ date: string; display: string; count: number }[]>
+  checkArxivSummaryStatus: (ids: string[]) => Promise<Record<string, boolean>>
+  getArxivSummary: (id: string) => Promise<string | null>
 
   // Config
   listTopics: () => Promise<Topic[]>
@@ -106,41 +102,38 @@ interface ElectronAPI {
   clearAnalyses: () => Promise<{ success: boolean }>
 
   // Fetch
-  fetchPapers: (categories?: string[]) => Promise<{
+  fetchArxivPapers: (categories?: string[]) => Promise<{
     success: boolean; new_count: number; existing_count: number
     failed_categories: string[]; failed_details: { category: string; error: string }[]
   }>
-  fetchPapersThisWeek: (categories?: string[]) => Promise<{
+  fetchArxivPapersThisWeek: (categories?: string[]) => Promise<{
     success: boolean; new_count: number; existing_count: number
     failed_categories: string[]; failed_details: { category: string; error: string }[]
   }>
-  fetchPapersByDate: (params: { startDate: string; endDate: string; categories?: string[] }) => Promise<{
+  fetchArxivPapersByDate: (params: { startDate: string; endDate: string; categories?: string[] }) => Promise<{
     success: boolean; local_count: number; new_count: number; total_count: number
     failed_categories: string[]; failed_details: { category: string; error: string }[]
     error?: string
   }>
 
   // Summary
-  summarizePaper: (paperId: string, skipIfAnalyzed?: boolean) => Promise<{ success: boolean; summary: string | null; skipped?: boolean; cancelled?: boolean }>
-  summarizeAllUnanalyzed: () => Promise<{ success: boolean; analyzed?: number; errors?: number; stopped?: boolean; message?: string }>
-  stopSummary: () => Promise<{ success: boolean }>
-  getUnanalyzedPaperIds: () => Promise<{ id: string; title: string }[]>
+  summarizeArxivPaper: (paperId: string, skipIfAnalyzed?: boolean) => Promise<{ success: boolean; summary: string | null; skipped?: boolean; cancelled?: boolean }>
+  stopArxivSummary: () => Promise<{ success: boolean }>
   testLLMConnection: () => Promise<{ success: boolean; message: string }>
   testZoteroConnection: () => Promise<{ success: boolean; message: string }>
 
   // Analysis (full paper)
-  analyzeFullPaper: (id: string) => Promise<{ success: boolean; cancelled?: boolean }>
-  getPaperAnalysis: (id: string) => Promise<string | null>
-  getUnanalyzedAnalysisPapers: () => Promise<{ id: string; title: string }[]>
-  stopAnalysis: () => Promise<{ success: boolean }>
+  analyzeArxivFullPaper: (id: string) => Promise<{ success: boolean; cancelled?: boolean }>
+  getArxivAnalysis: (id: string) => Promise<string | null>
+  stopArxivAnalysis: () => Promise<{ success: boolean }>
 
   // PDF download
-  downloadPdf: (id: string) => Promise<string>
-  openPdf: (id: string) => Promise<void>
-  isPdfCached: (id: string) => Promise<boolean>
-  deletePdf: (id: string) => Promise<void>
-  deleteSummary: (id: string) => Promise<void>
-  deleteAnalysis: (id: string) => Promise<void>
+  downloadArxivPdf: (id: string) => Promise<string>
+  openArxivPdf: (id: string) => Promise<void>
+  isArxivPdfCached: (id: string) => Promise<boolean>
+  deleteArxivPdf: (id: string) => Promise<void>
+  deleteArxivSummary: (id: string) => Promise<void>
+  deleteArxivAnalysis: (id: string) => Promise<void>
   onPdfDownloadProgress: (callback: (data: { paperId: string; loaded: number; total?: number }) => void) => () => void
 
   // Zotero
@@ -164,11 +157,11 @@ interface ElectronAPI {
     page?: number
     pageSize?: number
   }) => Promise<{ items: ConferencePaper[]; total: number; page: number; page_size: number }>
-  getConferencePaperDetail: (paperId: string) => Promise<ConferencePaper>
   listConferenceTracks: (conferenceId: number) => Promise<{ track: string; count: number }[]>
+  conferenceCheckPapersSummaryStatus: (ids: string[]) => Promise<Record<string, boolean>>
+  conferenceGetPaperSummary: (id: string) => Promise<string | null>
   conferenceSummarizePaper: (paperId: string, skipIfAnalyzed?: boolean) => Promise<{ success: boolean; summary: string | null; skipped?: boolean; cancelled?: boolean }>
   conferenceStopSummary: () => Promise<{ success: boolean }>
-  conferenceGetUnanalyzedIds: () => Promise<{ id: string; title: string }[]>
   conferenceAnalyzeFullPaper: (id: string) => Promise<{ success: boolean; cancelled?: boolean }>
   conferenceGetPaperAnalysis: (id: string) => Promise<string | null>
   conferenceStopAnalysis: () => Promise<{ success: boolean }>

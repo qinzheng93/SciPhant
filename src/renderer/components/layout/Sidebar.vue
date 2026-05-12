@@ -77,11 +77,11 @@
           总结论文
         </button>
         <div v-if="activeMenu === 'summarize'" class="dropdown-menu">
-          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeConferenceCurrent()">
+          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeCurrentPapers()">
             <PenLine :size="13" />
             总结当前列表
           </div>
-          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeConferenceSelected()">
+          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeSelectedPapers()">
             <PenLine :size="13" />
             总结选中论文
           </div>
@@ -311,7 +311,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Download, PenLine, Settings, ListChecks } from 'lucide-vue-next'
-import { fetchPapers, fetchPapersThisWeek, fetchPapersByDate, getUnanalyzedPaperIds, listCategories, listPapers, listConferencePapers } from '../../api'
+import { fetchArxivPapers, fetchArxivPapersThisWeek, fetchArxivPapersByDate, listCategories, listArxivPapers, listConferencePapers, checkArxivSummaryStatus, conferenceCheckPapersSummaryStatus } from '../../api'
 import type { Category } from '../../types/config'
 import { usePapersStore } from '../../stores/papers'
 import { useConferencePapersStore } from '../../stores/conference-papers'
@@ -463,7 +463,7 @@ async function doFetch(mode: 'today' | 'week') {
   fetchingToastId = toastStore.show('抓取中', `正在获取${label}论文...`, 'info', undefined, 0)
 
   try {
-    const apiFn = mode === 'today' ? fetchPapers : fetchPapersThisWeek
+    const apiFn = mode === 'today' ? fetchArxivPapers : fetchArxivPapersThisWeek
     const result = await apiFn()
 
     if (result.success) {
@@ -561,7 +561,7 @@ const fetchByDateAction = async () => {
       endDate: dateForm.endDate,
       categories: [...dateForm.selectedCategories],
     }
-    const result = await fetchPapersByDate(params)
+    const result = await fetchArxivPapersByDate(params)
 
     await Promise.all([
       papersStore.loadFetchDates(),
@@ -581,10 +581,23 @@ const fetchByDateAction = async () => {
 }
 
 const analyzePapersAction = async () => {
+  const isConf = modeStore.isConference
+  const listFn = isConf ? listConferencePapers : listArxivPapers
+  const checkFn = isConf ? conferenceCheckPapersSummaryStatus : checkArxivSummaryStatus
+  const params = isConf
+    ? {
+        conferenceId: conferenceStore.selectedConferenceId || undefined,
+        tracks: conferenceStore.selectedTracks.length > 0 ? [...conferenceStore.selectedTracks] : undefined,
+        topicIds: conferenceStore.selectedTopicIds.length > 0 ? [...conferenceStore.selectedTopicIds] : undefined,
+      }
+    : {
+        topicIds: papersStore.selectedTopicIds.length > 0 ? [...papersStore.selectedTopicIds] : undefined,
+      }
+
   try {
-    const items = await getUnanalyzedPaperIds()
-    const tagged = items.map(i => ({ ...i, conference: false }))
-    const added = queueStore.enqueue(tagged)
+    const allIds = await fetchAllPaperIds(listFn, params)
+    const needsSummary = await filterNeedsSummary(checkFn, allIds)
+    const added = queueStore.enqueue(needsSummary.map(p => ({ ...p, conference: isConf })))
     if (added === 0) {
       toastStore.show('提示', '所有未分析论文已在队列中', 'info')
     }
@@ -594,21 +607,53 @@ const analyzePapersAction = async () => {
   }
 }
 
+/** Fetch all paper IDs for current list, paginated */
+async function fetchAllPaperIds(
+  listFn: (params: any) => Promise<{ items: { id: string; title: string }[]; total: number }>,
+  params: Record<string, unknown>,
+): Promise<{ id: string; title: string }[]> {
+  const allIds: { id: string; title: string }[] = []
+  const first = await listFn({ ...params, pageSize: 100 })
+  first.items.forEach(p => allIds.push({ id: p.id, title: p.title }))
+  const totalPages = Math.ceil(first.total / 100)
+  for (let page = 2; page <= totalPages; page++) {
+    const result = await listFn({ ...params, page, pageSize: 100 })
+    result.items.forEach(p => allIds.push({ id: p.id, title: p.title }))
+  }
+  return allIds
+}
+
+/** Filter out papers that already have summaries */
+async function filterNeedsSummary(
+  checkStatusFn: (ids: string[]) => Promise<Record<string, boolean>>,
+  papers: { id: string; title: string }[],
+): Promise<{ id: string; title: string }[]> {
+  const ids = papers.map(p => p.id)
+  const statuses = await checkStatusFn(ids)
+  return papers.filter(p => !statuses[p.id])
+}
+
 const summarizeCurrentPapers = async () => {
+  const isConf = modeStore.isConference
+  const listFn = isConf ? listConferencePapers : listArxivPapers
+  const checkFn = isConf ? conferenceCheckPapersSummaryStatus : checkArxivSummaryStatus
+  const params = isConf
+    ? {
+        conferenceId: conferenceStore.selectedConferenceId || undefined,
+        tracks: conferenceStore.selectedTracks.length > 0 ? [...conferenceStore.selectedTracks] : undefined,
+        topicIds: conferenceStore.selectedTopicIds.length > 0 ? [...conferenceStore.selectedTopicIds] : undefined,
+        search: conferenceStore.searchQuery || undefined,
+      }
+    : {
+        fetchDate: papersStore.selectedDate || undefined,
+        topicIds: papersStore.selectedTopicIds.length > 0 ? [...papersStore.selectedTopicIds] : undefined,
+        search: papersStore.searchQuery || undefined,
+      }
+
   try {
-    const params = {
-      fetchDate: papersStore.selectedDate || undefined,
-      topicIds: papersStore.selectedTopicIds.length > 0 ? [...papersStore.selectedTopicIds] : undefined,
-      search: papersStore.searchQuery || undefined,
-    }
-    const first = await listPapers({ ...params, pageSize: 100 })
-    const items = first.items.map(p => ({ id: p.id, title: p.title, conference: false }))
-    const totalPages = Math.ceil(first.total / 100)
-    for (let page = 2; page <= totalPages; page++) {
-      const result = await listPapers({ ...params, page, pageSize: 100 })
-      items.push(...result.items.map(p => ({ id: p.id, title: p.title, conference: false })))
-    }
-    const added = queueStore.enqueue(items)
+    const allIds = await fetchAllPaperIds(listFn, params)
+    const needsSummary = await filterNeedsSummary(checkFn, allIds)
+    const added = queueStore.enqueue(needsSummary.map(p => ({ ...p, conference: isConf })))
     if (added === 0) {
       toastStore.show('提示', '当前论文已在队列中', 'info')
     }
@@ -617,58 +662,32 @@ const summarizeCurrentPapers = async () => {
   }
 }
 
-const summarizeSelectedPapers = () => {
-  const ids = papersStore.selectedPaperIds
+const summarizeSelectedPapers = async () => {
+  const isConf = modeStore.isConference
+  const store = isConf ? conferenceStore : papersStore
+  const checkFn = isConf ? conferenceCheckPapersSummaryStatus : checkArxivSummaryStatus
+  const ids = [...store.selectedPaperIds]
+
   if (ids.length === 0) {
     toastStore.show('提示', '请先选择论文', 'info')
     return
   }
-  const items = ids.map(id => {
-    const paper = papersStore.papers.find(p => p.id === id)
-    return { id, title: paper?.title || id, conference: false }
-  })
-  const added = queueStore.enqueue(items)
-  if (added === 0) {
-    toastStore.show('提示', '选中论文已在队列中', 'info')
-  }
-}
-
-const summarizeConferenceCurrent = async () => {
   try {
-    const params = {
-      conferenceId: conferenceStore.selectedConferenceId || undefined,
-      tracks: conferenceStore.selectedTracks.length > 0 ? [...conferenceStore.selectedTracks] : undefined,
-      search: conferenceStore.searchQuery || undefined,
+    const needsSummary = (await filterNeedsSummary(checkFn, ids.map(id => {
+      const paper = store.papers.find(p => p.id === id)
+      return { id, title: paper?.title || id }
+    }))).map(p => ({ ...p, conference: isConf }))
+
+    if (needsSummary.length === 0) {
+      toastStore.show('提示', '选中论文均已总结', 'info')
+      return
     }
-    const first = await listConferencePapers({ ...params, pageSize: 100 })
-    const items = first.items.map(p => ({ id: p.id, title: p.title, conference: true }))
-    const totalPages = Math.ceil(first.total / 100)
-    for (let page = 2; page <= totalPages; page++) {
-      const result = await listConferencePapers({ ...params, page, pageSize: 100 })
-      items.push(...result.items.map(p => ({ id: p.id, title: p.title, conference: true })))
-    }
-    const added = queueStore.enqueue(items)
+    const added = queueStore.enqueue(needsSummary)
     if (added === 0) {
-      toastStore.show('提示', '当前论文已在队列中', 'info')
+      toastStore.show('提示', '选中论文已在队列中', 'info')
     }
   } catch (err: unknown) {
-    toastStore.show('获取失败', '获取当前论文失败', 'error', extractErrorMessage(err))
-  }
-}
-
-const summarizeConferenceSelected = () => {
-  const ids = conferenceStore.selectedPaperIds
-  if (ids.length === 0) {
-    toastStore.show('提示', '请先选择论文', 'info')
-    return
-  }
-  const items = ids.map(id => {
-    const paper = conferenceStore.papers.find(p => p.id === id)
-    return { id, title: paper?.title || id, conference: true }
-  })
-  const added = queueStore.enqueue(items)
-  if (added === 0) {
-    toastStore.show('提示', '选中论文已在队列中', 'info')
+    toastStore.show('总结失败', '检查论文状态失败', 'error', extractErrorMessage(err))
   }
 }
 </script>
@@ -860,7 +879,7 @@ const summarizeConferenceSelected = () => {
 
 .mode-toggle {
   position: relative;
-  width: 60px;
+  width: 64px;
   height: 24px;
   background: #b91c1c;
   border-radius: 12px;
@@ -878,18 +897,22 @@ const summarizeConferenceSelected = () => {
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 18px;
+  width: 26px;
   height: 18px;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--toggle-thumb-bg);
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   z-index: 2;
   transition: left 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-placeholder);
 }
 
 .mode-toggle.mode-conference .toggle-thumb {
-  left: calc(100% - 21px);
+  left: calc(100% - 29px);
 }
 
 .toggle-label {
@@ -906,12 +929,12 @@ const summarizeConferenceSelected = () => {
 }
 
 .toggle-label-left {
-  left: 21px;
+  left: 19px;
   opacity: 0;
 }
 
 .toggle-label-right {
-  left: 39px;
+  left: 46px;
   opacity: 1;
 }
 
@@ -1105,7 +1128,7 @@ const summarizeConferenceSelected = () => {
 .sidebar-queue-panel .queue-item {
   display: grid;
   grid-template-columns: 1fr;
-  padding: 8px 16px;
+  padding: 8px 8px 8px 16px;
   overflow: hidden;
   align-items: center;
 }
@@ -1125,7 +1148,6 @@ const summarizeConferenceSelected = () => {
   font-size: 12px;
   font-weight: 500;
   color: var(--color-summary);
-  background: var(--color-summary-bg);
   padding: 1px 6px;
   border-radius: 4px;
   white-space: nowrap;
@@ -1134,7 +1156,7 @@ const summarizeConferenceSelected = () => {
 .sidebar-queue-panel .queue-item-title {
   grid-column: 1;
   grid-row: 1;
-  padding-right: 24px;
+  padding-right: 40px;
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.4;
@@ -1179,12 +1201,11 @@ const summarizeConferenceSelected = () => {
 }
 
 .sidebar-queue-panel .queue-item-active-deep {
-  background: var(--color-deep-bg);
+  background: var(--color-analysis-bg);
 }
 
 .sidebar-queue-panel .queue-item-status-deep {
-  color: var(--color-deep);
-  background: var(--color-deep-border);
+  color: var(--color-analysis);
 }
 
 .sidebar-dialog .dialog-overlay {

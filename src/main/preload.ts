@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const api = {
-  // Paper
-  listPapers: (params: unknown) => ipcRenderer.invoke('list-papers', params),
-  getPaperDetail: (id: string) => ipcRenderer.invoke('get-paper-detail', id),
-  listFetchDates: () => ipcRenderer.invoke('list-fetch-dates'),
-  listTopicCounts: () => ipcRenderer.invoke('list-topic-counts'),
+  // Paper (arXiv)
+  listArxivPapers: (params: unknown) => ipcRenderer.invoke('arxiv:list-papers', params),
+  listArxivFetchDates: () => ipcRenderer.invoke('arxiv:list-fetch-dates'),
+  checkArxivSummaryStatus: (ids: string[]) => ipcRenderer.invoke('arxiv:check-papers-summary-status', ids),
+  getArxivSummary: (id: string) => ipcRenderer.invoke('arxiv:get-paper-summary', id),
 
   // Config
   listTopics: () => ipcRenderer.invoke('list-topics'),
@@ -20,26 +20,24 @@ const api = {
   clearData: () => ipcRenderer.invoke('clear-data'),
   clearAnalyses: () => ipcRenderer.invoke('clear-analyses'),
 
-  // Fetch
-  fetchPapers: (categories?: string[]) => ipcRenderer.invoke('fetch-papers', categories),
-  fetchPapersThisWeek: (categories?: string[]) => ipcRenderer.invoke('fetch-papers-this-week', categories),
-  fetchPapersByDate: (params: unknown) => ipcRenderer.invoke('fetch-papers-by-date', params),
+  // Fetch (arXiv)
+  fetchArxivPapers: (categories?: string[]) => ipcRenderer.invoke('arxiv:fetch-papers', categories),
+  fetchArxivPapersThisWeek: (categories?: string[]) => ipcRenderer.invoke('arxiv:fetch-papers-this-week', categories),
+  fetchArxivPapersByDate: (params: unknown) => ipcRenderer.invoke('arxiv:fetch-papers-by-date', params),
 
-  // Summary
-  summarizePaper: (id: string, skipIfAnalyzed?: boolean) => ipcRenderer.invoke('summarize-paper', id, skipIfAnalyzed),
-  summarizeAllUnanalyzed: () => ipcRenderer.invoke('summarize-all-unanalyzed'),
-  stopSummary: () => ipcRenderer.invoke('stop-summary'),
-  getUnanalyzedPaperIds: () => ipcRenderer.invoke('get-unanalyzed-paper-ids'),
+  // Summary (arXiv)
+  summarizeArxivPaper: (id: string, skipIfAnalyzed?: boolean) => ipcRenderer.invoke('arxiv:summarize-paper', id, skipIfAnalyzed),
+  stopArxivSummary: () => ipcRenderer.invoke('arxiv:stop-summary'),
   testLLMConnection: () => ipcRenderer.invoke('test-llm-connection'),
   testZoteroConnection: () => ipcRenderer.invoke('test-zotero-connection'),
 
-  // PDF download
-  downloadPdf: (id: string) => ipcRenderer.invoke('download-pdf', id),
-  openPdf: (id: string) => ipcRenderer.invoke('open-pdf', id),
-  isPdfCached: (id: string) => ipcRenderer.invoke('is-pdf-cached', id),
-  deletePdf: (id: string) => ipcRenderer.invoke('delete-pdf', id),
-  deleteSummary: (id: string) => ipcRenderer.invoke('delete-summary', id),
-  deleteAnalysis: (id: string) => ipcRenderer.invoke('delete-analysis', id),
+  // PDF download (arXiv)
+  downloadArxivPdf: (id: string) => ipcRenderer.invoke('arxiv:download-pdf', id),
+  openArxivPdf: (id: string) => ipcRenderer.invoke('arxiv:open-pdf', id),
+  isArxivPdfCached: (id: string) => ipcRenderer.invoke('arxiv:is-pdf-cached', id),
+  deleteArxivPdf: (id: string) => ipcRenderer.invoke('arxiv:delete-pdf', id),
+  deleteArxivSummary: (id: string) => ipcRenderer.invoke('arxiv:delete-summary', id),
+  deleteArxivAnalysis: (id: string) => ipcRenderer.invoke('arxiv:delete-analysis', id),
   onPdfDownloadProgress: (callback: (data: { paperId: string; loaded: number; total?: number }) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: { paperId: string; loaded: number; total?: number }) => {
       callback(data);
@@ -52,11 +50,10 @@ const api = {
   listZoteroCollections: () => ipcRenderer.invoke('list-zotero-collections'),
   exportPaperToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => ipcRenderer.invoke('export-paper-to-zotero', paperId, collectionKey, summaryHtml, analysisHtml),
 
-  // Analysis (full paper)
-  analyzeFullPaper: (id: string) => ipcRenderer.invoke('analyze-full-paper', id),
-  getPaperAnalysis: (id: string) => ipcRenderer.invoke('get-paper-analysis', id),
-  getUnanalyzedAnalysisPapers: () => ipcRenderer.invoke('get-unanalyzed-analysis-papers'),
-  stopAnalysis: () => ipcRenderer.invoke('stop-analysis'),
+  // Analysis (arXiv full paper)
+  analyzeArxivFullPaper: (id: string) => ipcRenderer.invoke('arxiv:analyze-full-paper', id),
+  getArxivAnalysis: (id: string) => ipcRenderer.invoke('arxiv:get-paper-analysis', id),
+  stopArxivAnalysis: () => ipcRenderer.invoke('arxiv:stop-analysis'),
 
   // Dialog
   openDirectory: () => ipcRenderer.invoke('open-directory'),
@@ -80,11 +77,11 @@ const api = {
   // Conference
   listConferences: () => ipcRenderer.invoke('conference:list-conferences'),
   listConferencePapers: (params: unknown) => ipcRenderer.invoke('conference:list-papers', params),
-  getConferencePaperDetail: (id: string) => ipcRenderer.invoke('conference:get-paper-detail', id),
   listConferenceTracks: (conferenceId: number) => ipcRenderer.invoke('conference:list-tracks', conferenceId),
+  conferenceCheckPapersSummaryStatus: (ids: string[]) => ipcRenderer.invoke('conference:check-papers-summary-status', ids),
+  conferenceGetPaperSummary: (id: string) => ipcRenderer.invoke('conference:get-paper-summary', id),
   conferenceSummarizePaper: (id: string, skipIfAnalyzed?: boolean) => ipcRenderer.invoke('conference:summarize-paper', id, skipIfAnalyzed),
   conferenceStopSummary: () => ipcRenderer.invoke('conference:stop-summary'),
-  conferenceGetUnanalyzedIds: () => ipcRenderer.invoke('conference:get-unanalyzed-ids'),
   conferenceAnalyzeFullPaper: (id: string) => ipcRenderer.invoke('conference:analyze-full-paper', id),
   conferenceGetPaperAnalysis: (id: string) => ipcRenderer.invoke('conference:get-paper-analysis', id),
   conferenceStopAnalysis: () => ipcRenderer.invoke('conference:stop-analysis'),

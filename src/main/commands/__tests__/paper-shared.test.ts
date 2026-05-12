@@ -44,32 +44,10 @@ describe('rowToPaper', () => {
       updated_date: '2024-03-15',
       categories: '["cs.AI", "cs.LG"]',
       fetched_at: '2024-03-15',
-      summary: 'Summary',
-      analysis: 'Analysis',
     };
     const paper = rowToPaper(row);
     expect(paper.authors).toEqual(['Alice', 'Bob']);
     expect(paper.categories).toEqual(['cs.AI', 'cs.LG']);
-  });
-
-  it('handles null summary and analysis', () => {
-    const row: Record<string, unknown> = {
-      id: '1',
-      title: 'T',
-      authors: '[]',
-      abstract_text: '',
-      url: '',
-      pdf_url: '',
-      published_date: '',
-      updated_date: '',
-      categories: '[]',
-      fetched_at: '',
-      summary: null,
-      analysis: null,
-    };
-    const paper = rowToPaper(row);
-    expect(paper.summary).toBeNull();
-    expect(paper.analysis).toBeNull();
   });
 
   it('handles empty arrays', () => {
@@ -84,8 +62,6 @@ describe('rowToPaper', () => {
       updated_date: '',
       categories: '[]',
       fetched_at: '',
-      summary: null,
-      analysis: null,
     };
     const paper = rowToPaper(row);
     expect(paper.authors).toEqual([]);

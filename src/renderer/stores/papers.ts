@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { PaperWithAnalysis } from '../types/paper'
+import type { Paper } from '../types/paper'
 import type { FetchDate } from '../api'
-import { listPapers, summarizePaper as apiSummarizePaper, listFetchDates, getPaperDetail } from '../api'
+import { listArxivPapers, checkArxivSummaryStatus, listArxivFetchDates } from '../api'
 
 const PAGE_SIZE = 20
 
 export const usePapersStore = defineStore('papers', () => {
   // State
-  const papers = ref<PaperWithAnalysis[]>([])
+  const papers = ref<Paper[]>([])
   const fetchDates = ref<FetchDate[]>([])
   const selectedPaperIds = ref<string[]>([])
   const selectedDate = ref<string | null>(null) // null = "全部"
@@ -21,6 +21,8 @@ export const usePapersStore = defineStore('papers', () => {
     pageSize: PAGE_SIZE,
     total: 0,
   })
+  const summarizedIds = ref<Set<string>>(new Set())
+  const contentVersion = ref(0)
 
   // Total count across all dates
   const totalCount = computed(() =>
@@ -33,9 +35,24 @@ export const usePapersStore = defineStore('papers', () => {
   // Actions
   const loadFetchDates = async () => {
     try {
-      fetchDates.value = await listFetchDates()
+      fetchDates.value = await listArxivFetchDates()
     } catch (err) {
       console.error('Failed to load fetch dates:', err)
+    }
+  }
+
+  const refreshStatus = async () => {
+    const ids = papers.value.map(p => p.id)
+    if (ids.length === 0) return
+    try {
+      const statuses = await checkArxivSummaryStatus(ids)
+      const set = new Set<string>()
+      for (const [id, has] of Object.entries(statuses)) {
+        if (has) set.add(id)
+      }
+      summarizedIds.value = set
+    } catch (err) {
+      console.error('Failed to refresh status:', err)
     }
   }
 
@@ -54,7 +71,7 @@ export const usePapersStore = defineStore('papers', () => {
       searchQuery.value = params.search
     }
     try {
-      const result = await listPapers({
+      const result = await listArxivPapers({
         search: searchQuery.value || undefined,
         fetchDate: selectedDate.value || undefined,
         topicIds: selectedTopicIds.value.length > 0 ? [...selectedTopicIds.value] : undefined,
@@ -73,6 +90,9 @@ export const usePapersStore = defineStore('papers', () => {
 
       pagination.value.total = result.total
       pagination.value.page = result.page
+
+      // Refresh summary status from filesystem
+      await refreshStatus()
     } catch (err) {
       if (requestId !== loadRequestId) return
       error.value = err instanceof Error ? err.message : 'Failed to load papers'
@@ -104,16 +124,6 @@ export const usePapersStore = defineStore('papers', () => {
     await loadPapers()
   }
 
-  const selectPaper = async (id: string) => {
-    try {
-      const detail = await getPaperDetail(id)
-      const idx = papers.value.findIndex(p => p.id === id)
-      if (idx !== -1) papers.value.splice(idx, 1, detail)
-    } catch (err) {
-      console.error('Failed to select paper:', err)
-    }
-  }
-
   const toggleSelection = (id: string) => {
     const idx = selectedPaperIds.value.indexOf(id)
     if (idx >= 0) {
@@ -134,20 +144,6 @@ export const usePapersStore = defineStore('papers', () => {
     pagination.value.page = 1
   }
 
-  const analyzeCurrentPaper = async () => {
-    const id = selectedPaperIds.value[0]
-    if (!id) return
-    try {
-      await apiSummarizePaper(id)
-      const updated = await getPaperDetail(id)
-      const idx = papers.value.findIndex(p => p.id === id)
-      if (idx !== -1) papers.value[idx] = updated
-    } catch (err) {
-      console.error('Failed to analyze paper:', err)
-      throw err
-    }
-  }
-
   // Initialize
   loadFetchDates()
   loadPapers()
@@ -155,9 +151,9 @@ export const usePapersStore = defineStore('papers', () => {
   return {
     papers, fetchDates, selectedDate, selectedTopicIds, searchQuery,
     selectedPaperIds,
-    loading, error, pagination, totalCount,
+    loading, error, pagination, totalCount, contentVersion, summarizedIds,
     loadFetchDates, loadPapers, selectDate, selectTopic,
-    selectPaper, clearPapers, analyzeCurrentPaper,
-    toggleSelection, clearSelection,
+    clearPapers,
+    toggleSelection, clearSelection, refreshStatus,
   }
 })

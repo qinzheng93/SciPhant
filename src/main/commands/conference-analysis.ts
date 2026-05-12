@@ -1,35 +1,28 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import type { DeepAnalysisResult } from '../services/llm-client';
-import { LLMClient } from '../services/llm-client';
-import { extractTextFromUrl } from '../services/pdf-extractor';
-import { loadLLMConfig } from './config';
+import { getCategoryForConference } from './conference-summary';
+import { createAbortControllerManager, analyzeFullPaperCore, getPaperAnalysisContent, type ProgressCallback } from './paper-shared';
 
-let analysisAbortController: AbortController | null = null;
+const abortMgr = createAbortControllerManager();
 
 export function stopConferenceAnalysis(): { success: boolean } {
-  if (analysisAbortController) {
-    analysisAbortController.abort();
-    analysisAbortController = null;
-  }
-  return { success: true };
+  return abortMgr.stop();
 }
 
 export function setConferenceAnalysisAbortController(controller: AbortController | null): void {
-  analysisAbortController = controller;
+  abortMgr.set(controller);
 }
-
-export type ProgressCallback = (phase: string) => void;
 
 export async function analyzeConferenceFullPaper(
   conferenceDb: SqlJsDatabase,
-  analysesDb: SqlJsDatabase,
   settingsDb: SqlJsDatabase,
+  dataDir: string,
   paperId: string,
   signal?: AbortSignal,
-  dataDir?: string,
   onProgress?: ProgressCallback,
-): Promise<{ success: boolean; result?: DeepAnalysisResult }> {
-  // Read paper from conference DB
+): Promise<{ success: boolean; result?: import('../services/llm-client').DeepAnalysisResult }> {
+  const category = getCategoryForConference(conferenceDb, paperId);
+  if (!category) throw new Error(`Conference category not found for paper ${paperId}`);
+
   const results = conferenceDb.exec('SELECT title, pdf_url FROM papers WHERE id = ?', [paperId]);
   if (results.length === 0 || results[0].values.length === 0) {
     throw new Error(`Conference paper ${paperId} not found`);
@@ -37,60 +30,14 @@ export async function analyzeConferenceFullPaper(
   const title = results[0].values[0][0] as string;
   const pdfUrl = results[0].values[0][1] as string;
 
-  if (!pdfUrl) {
-    throw new Error(`Paper ${paperId} has no PDF URL`);
-  }
-
-  const fullText = await extractTextFromUrl(pdfUrl, signal, dataDir, onProgress);
-
-  if (!fullText.trim()) {
-    throw new Error('Failed to extract text from PDF');
-  }
-
-  onProgress?.('分析中');
-  const llmConfig = loadLLMConfig(settingsDb);
-  const client = new LLMClient(llmConfig.api_key, llmConfig.model, llmConfig.base_url, llmConfig.temperature);
-  const analysisResult = await client.analyzeFullPaper(title, fullText, signal);
-
-  // Save to analyses DB
-  analysesDb.run(
-    `INSERT INTO analyses (paper_id, analysis)
-     VALUES (?, ?)
-     ON CONFLICT(paper_id) DO UPDATE SET analysis = excluded.analysis`,
-    [paperId, analysisResult.analysis],
-  );
-
-  return { success: true, result: analysisResult };
+  return analyzeFullPaperCore(settingsDb, dataDir, category, paperId, title, pdfUrl, signal, onProgress);
 }
 
-export function getConferencePaperAnalysis(
-  analysesDb: SqlJsDatabase,
-  paperId: string,
-): string | null {
-  const results = analysesDb.exec('SELECT analysis FROM analyses WHERE paper_id = ?', [paperId]);
-  if (results.length === 0 || results[0].values.length === 0) return null;
-  return results[0].values[0][0] as string || null;
-}
-
-export function getUnanalyzedConferencePapers(
+export async function getConferencePaperAnalysis(
   conferenceDb: SqlJsDatabase,
-  analysesDb: SqlJsDatabase,
-): { id: string; title: string }[] {
-  // Get paper IDs that have analyses
-  const analyzedResults = analysesDb.exec('SELECT paper_id FROM analyses WHERE analysis IS NOT NULL AND analysis != \'\'');
-  const analyzedIds = new Set<string>();
-  if (analyzedResults.length > 0) {
-    for (const row of analyzedResults[0].values) {
-      analyzedIds.add(row[0] as string);
-    }
-  }
-
-  const papersResults = conferenceDb.exec(
-    'SELECT id, title FROM papers WHERE pdf_url IS NOT NULL AND pdf_url != \'\' ORDER BY id ASC',
-  );
-  if (papersResults.length === 0) return [];
-
-  return papersResults[0].values
-    .filter(row => !analyzedIds.has(row[0] as string))
-    .map(row => ({ id: row[0] as string, title: row[1] as string }));
+  dataDir: string,
+  paperId: string,
+): Promise<string | null> {
+  const category = getCategoryForConference(conferenceDb, paperId);
+  return getPaperAnalysisContent(dataDir, category, paperId);
 }

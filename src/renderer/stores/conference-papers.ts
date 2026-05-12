@@ -2,9 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
   listConferencePapers,
-  getConferencePaperDetail,
   listConferences as apiListConferences,
   listConferenceTracks,
+  conferenceCheckPapersSummaryStatus,
 } from '../api'
 
 const PAGE_SIZE = 20
@@ -25,6 +25,8 @@ export const useConferencePapersStore = defineStore('conferencePapers', () => {
     pageSize: PAGE_SIZE,
     total: 0,
   })
+  const contentVersion = ref(0)
+  const summarizedIds = ref<Set<string>>(new Set())
 
   const totalCount = computed(() =>
     conferences.value.reduce((sum, c) => sum + c.paper_count, 0)
@@ -46,6 +48,21 @@ export const useConferencePapersStore = defineStore('conferencePapers', () => {
     } catch (err) {
       console.error('Failed to load tracks:', err)
       tracks.value = []
+    }
+  }
+
+  const refreshStatus = async () => {
+    const ids = papers.value.map(p => p.id)
+    if (ids.length === 0) return
+    try {
+      const statuses = await conferenceCheckPapersSummaryStatus(ids)
+      const set = new Set<string>()
+      for (const [id, has] of Object.entries(statuses)) {
+        if (has) set.add(id)
+      }
+      summarizedIds.value = set
+    } catch (err) {
+      console.error('Failed to refresh conference status:', err)
     }
   }
 
@@ -83,6 +100,9 @@ export const useConferencePapersStore = defineStore('conferencePapers', () => {
 
       pagination.value.total = result.total
       pagination.value.page = result.page
+
+      // Refresh summary status from filesystem
+      await refreshStatus()
     } catch (err) {
       if (requestId !== loadRequestId) return
       error.value = err instanceof Error ? err.message : 'Failed to load conference papers'
@@ -131,16 +151,6 @@ export const useConferencePapersStore = defineStore('conferencePapers', () => {
     await loadPapers()
   }
 
-  const selectPaper = async (id: string) => {
-    try {
-      const detail = await getConferencePaperDetail(id)
-      const idx = papers.value.findIndex(p => p.id === id)
-      if (idx !== -1) papers.value.splice(idx, 1, detail)
-    } catch (err) {
-      console.error('Failed to select conference paper:', err)
-    }
-  }
-
   const toggleSelection = (id: string) => {
     const idx = selectedPaperIds.value.indexOf(id)
     if (idx >= 0) {
@@ -165,10 +175,10 @@ export const useConferencePapersStore = defineStore('conferencePapers', () => {
     papers, conferences, tracks,
     selectedConferenceId, selectedTracks, selectedTopicIds,
     selectedPaperIds,
-    searchQuery, loading, error, pagination, totalCount,
+    searchQuery, loading, error, pagination, totalCount, contentVersion, summarizedIds,
     loadConferences, loadTracks, loadPapers,
     selectConference, toggleTrack, selectTopic,
-    selectPaper, clearPapers,
-    toggleSelection, clearSelection,
+    clearPapers,
+    toggleSelection, clearSelection, refreshStatus,
   }
 })

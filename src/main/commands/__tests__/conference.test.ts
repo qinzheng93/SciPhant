@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
-import initSqlJs from 'sql.js';
 import {
-  listConferences, listConferencePapers, getConferencePaperDetail,
+  listConferences, listConferencePapers,
   listConferenceTracks, getConferencePaperPdfUrl,
 } from '../conference-paper';
 import {
@@ -10,6 +9,7 @@ import {
 import {
   stopConferenceAnalysis,
 } from '../conference-analysis';
+import initSqlJs from 'sql.js';
 
 function createDb() {
   return new (globalThis as any).__testSQL.Database();
@@ -40,16 +40,6 @@ function setupConferenceDb(): ReturnType<typeof createDb> {
   return db;
 }
 
-function setupAnalysesDb(): ReturnType<typeof createDb> {
-  const db = createDb();
-  db.run(`CREATE TABLE IF NOT EXISTS analyses (
-    paper_id TEXT PRIMARY KEY,
-    summary TEXT DEFAULT '',
-    analysis TEXT DEFAULT ''
-  )`);
-  return db;
-}
-
 beforeAll(async () => {
   const SQL = await initSqlJs();
   (globalThis as any).__testSQL = SQL;
@@ -57,16 +47,13 @@ beforeAll(async () => {
 
 describe('conference-paper commands', () => {
   let confDb: ReturnType<typeof createDb>;
-  let analysesDb: ReturnType<typeof createDb>;
 
   beforeEach(() => {
     confDb = setupConferenceDb();
-    analysesDb = setupAnalysesDb();
   });
 
   afterEach(() => {
     confDb.close();
-    analysesDb.close();
   });
 
   describe('listConferences', () => {
@@ -96,56 +83,36 @@ describe('conference-paper commands', () => {
     });
 
     it('returns paginated results', () => {
-      const result = listConferencePapers(confDb, analysesDb, null, null, { conferenceId: 1 });
+      const result = listConferencePapers(confDb, null, null, { conferenceId: 1 });
       expect(result.items).toHaveLength(3);
       expect(result.total).toBe(3);
       expect(result.page).toBe(1);
     });
 
     it('filters by search', () => {
-      const result = listConferencePapers(confDb, analysesDb, null, null, { conferenceId: 1, search: 'AI' });
+      const result = listConferencePapers(confDb, null, null, { conferenceId: 1, search: 'AI' });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].id).toBe('p1');
     });
 
     it('filters by tracks', () => {
-      const result = listConferencePapers(confDb, analysesDb, null, null, { conferenceId: 1, tracks: ['Main'] });
+      const result = listConferencePapers(confDb, null, null, { conferenceId: 1, tracks: ['Main'] });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].id).toBe('p1');
     });
 
-    it('includes summary/analysis from analysesDb', () => {
-      analysesDb.run("INSERT INTO analyses VALUES ('p1', 'test summary', 'test analysis')");
-      const result = listConferencePapers(confDb, analysesDb, null, null, { conferenceId: 1 });
-      const p1 = result.items.find(p => p.id === 'p1');
-      expect(p1!.summary).toBe('test summary');
-      expect(p1!.analysis).toBe('test analysis');
+    it('returns papers from DB', () => {
+      const result = listConferencePapers(confDb, null, null, { conferenceId: 1 });
+      expect(result.items[0].id).toBe('p1');
     });
 
     it('paginates correctly', () => {
-      const result = listConferencePapers(confDb, analysesDb, null, null, { conferenceId: 1, page: 1, pageSize: 2 });
+      const result = listConferencePapers(confDb, null, null, { conferenceId: 1, page: 1, pageSize: 2 });
       expect(result.items).toHaveLength(2);
       expect(result.total).toBe(3);
 
-      const page2 = listConferencePapers(confDb, analysesDb, null, null, { conferenceId: 1, page: 2, pageSize: 2 });
+      const page2 = listConferencePapers(confDb, null, null, { conferenceId: 1, page: 2, pageSize: 2 });
       expect(page2.items).toHaveLength(1);
-    });
-  });
-
-  describe('getConferencePaperDetail', () => {
-    it('throws for missing paper', () => {
-      expect(() => getConferencePaperDetail(confDb, analysesDb, 'nonexistent')).toThrow('not found');
-    });
-
-    it('returns paper with analyses', () => {
-      confDb.run("INSERT INTO conferences VALUES (1, 'CVPR', 2024, '')");
-      confDb.run("INSERT INTO papers VALUES ('p1', 1, 'Test', '[]', 'abstract', NULL, NULL, NULL, NULL, NULL, NULL, NULL)");
-      analysesDb.run("INSERT INTO analyses VALUES ('p1', 'summary', 'analysis')");
-
-      const paper = getConferencePaperDetail(confDb, analysesDb, 'p1');
-      expect(paper.id).toBe('p1');
-      expect(paper.summary).toBe('summary');
-      expect(paper.analysis).toBe('analysis');
     });
   });
 

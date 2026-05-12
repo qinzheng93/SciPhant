@@ -7,7 +7,7 @@
       </div>
       <div class="divider"></div>
       <MainContent>
-        <PaperList @select="handleSelect" />
+        <PaperList />
       </MainContent>
       <div class="resize-bar" @mousedown="startResize"></div>
       <div class="panel-wrapper detail-wrapper" ref="detailRef">
@@ -54,13 +54,6 @@ const detailPaper = computed(() => {
   return null
 })
 
-const handleSelect = (paperId: string) => {
-  if (modeStore.isConference) {
-    conferenceStore.selectPaper(paperId)
-  } else {
-    papersStore.selectPaper(paperId)
-  }
-}
 
 const clearSelection = () => {
   if (modeStore.isConference) {

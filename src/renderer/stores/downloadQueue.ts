@@ -70,7 +70,7 @@ export const useDownloadQueueStore = defineStore('downloadQueue', () => {
     // Check if already cached
     const cached = isConferenceItem(paperId)
       ? await window.api.conferenceIsPdfCached(paperId)
-      : await window.api.isPdfCached(paperId)
+      : await window.api.isArxivPdfCached(paperId)
     if (cached) return paperId
 
     // Register as waiter
@@ -136,7 +136,7 @@ export const useDownloadQueueStore = defineStore('downloadQueue', () => {
           if (item.conference) {
             await window.api.conferenceDownloadPdf(item.id)
           } else {
-            await window.api.downloadPdf(item.id)
+            await window.api.downloadArxivPdf(item.id)
           }
           currentProgress.value = 100
           resolveWaiters(item.id, item.id)

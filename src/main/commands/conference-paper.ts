@@ -1,4 +1,7 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
+import { execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared';
+
+
 
 export interface ConferencePaper {
   id: string;
@@ -16,8 +19,6 @@ export interface ConferencePaper {
   pages: string | null;
   track: string | null;
   detail_url: string | null;
-  summary: string | null;
-  analysis: string | null;
 }
 
 export interface ConferenceInfo {
@@ -28,14 +29,14 @@ export interface ConferenceInfo {
   paper_count: number;
 }
 
-export interface ConferencePaginatedResult {
+interface ConferencePaginatedResult {
   items: ConferencePaper[];
   total: number;
   page: number;
   page_size: number;
 }
 
-export interface TrackCount {
+interface TrackCount {
   track: string;
   count: number;
 }
@@ -52,8 +53,7 @@ function parseJson(text: string): unknown {
   return JSON.parse(text);
 }
 
-function rowToConferencePaper(row: Record<string, unknown>, analysesMap: Map<string, { summary: string | null; analysis: string | null }>): ConferencePaper {
-  const a = analysesMap.get(row.id as string);
+function rowToConferencePaper(row: Record<string, unknown>): ConferencePaper {
   return {
     id: row.id as string,
     conference_id: row.conference_id as number,
@@ -70,37 +70,7 @@ function rowToConferencePaper(row: Record<string, unknown>, analysesMap: Map<str
     pages: row.pages as string | null,
     track: row.track as string | null,
     detail_url: row.detail_url as string | null,
-    summary: a?.summary ?? null,
-    analysis: a?.analysis ?? null,
   };
-}
-
-function execToRows(results: { columns: string[]; values: unknown[][] }): Record<string, unknown>[] {
-  return results.values.map(row => {
-    const obj: Record<string, unknown> = {};
-    for (let i = 0; i < results.columns.length; i++) {
-      obj[results.columns[i]] = row[i];
-    }
-    return obj;
-  });
-}
-
-function loadAnalysesMap(analysesDb: SqlJsDatabase, paperIds: string[]): Map<string, { summary: string | null; analysis: string | null }> {
-  const map = new Map<string, { summary: string | null; analysis: string | null }>();
-  if (paperIds.length === 0) return map;
-  const placeholders = paperIds.map(() => '?').join(',');
-  const results = analysesDb.exec(
-    `SELECT paper_id, summary, analysis FROM analyses WHERE paper_id IN (${placeholders})`,
-    paperIds,
-  );
-  if (results.length === 0) return map;
-  for (const row of results[0].values) {
-    map.set(row[0] as string, {
-      summary: row[1] as string || null,
-      analysis: row[2] as string || null,
-    });
-  }
-  return map;
 }
 
 export function listConferences(conferenceDb: SqlJsDatabase): ConferenceInfo[] {
@@ -123,7 +93,6 @@ export function listConferences(conferenceDb: SqlJsDatabase): ConferenceInfo[] {
 
 export function listConferencePapers(
   conferenceDb: SqlJsDatabase,
-  analysesDb: SqlJsDatabase,
   arxivDb: SqlJsDatabase | null,
   paperTopicsDb: SqlJsDatabase | null,
   params: {
@@ -147,8 +116,7 @@ export function listConferencePapers(
     bindValues.push(params.conferenceId);
   }
   if (params.search) {
-    const escaped = params.search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-    const pattern = `%${escaped}%`;
+    const pattern = buildSearchPattern(params.search);
     conditions.push("(p.title LIKE ? ESCAPE '\\' OR p.abstract LIKE ? ESCAPE '\\')");
     bindValues.push(pattern, pattern);
   }
@@ -158,18 +126,7 @@ export function listConferencePapers(
     bindValues.push(...params.tracks);
   }
   if (params.topicIds && params.topicIds.length > 0 && paperTopicsDb) {
-    const placeholders = params.topicIds.map(() => '?').join(',');
-    const ptResults = paperTopicsDb.exec(
-      `SELECT DISTINCT paper_id FROM conference_paper_topics WHERE topic_id IN (${placeholders})`,
-      params.topicIds,
-    );
-    if (ptResults.length > 0 && ptResults[0].values.length > 0) {
-      const paperIds = ptResults[0].values.map(r => r[0] as string);
-      conditions.push(`p.id IN (${paperIds.map(() => '?').join(',')})`);
-      bindValues.push(...paperIds);
-    } else {
-      conditions.push('1 = 0');
-    }
+    filterByTopicIds(paperTopicsDb, 'conference_paper_topics', params.topicIds, conditions, bindValues);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -184,27 +141,11 @@ export function listConferencePapers(
 
   let items: ConferencePaper[] = [];
   if (dataResults.length > 0 && dataResults[0].values.length > 0) {
-    const rows = execToRows(dataResults[0]);
-    const paperIds = rows.map(r => r.id as string);
-    const analysesMap = loadAnalysesMap(analysesDb, paperIds);
-    items = rows.map(row => rowToConferencePaper(row, analysesMap));
+    const rows = execResultToPaperRows(dataResults[0]);
+    items = rows.map(row => rowToConferencePaper(row));
   }
 
   return { items, total: total as number, page, page_size: pageSize };
-}
-
-export function getConferencePaperDetail(
-  conferenceDb: SqlJsDatabase,
-  analysesDb: SqlJsDatabase,
-  paperId: string,
-): ConferencePaper {
-  const results = conferenceDb.exec(`${PAPER_SQL} WHERE p.id = ?`, [paperId]);
-  if (results.length === 0 || results[0].values.length === 0) {
-    throw new Error(`Conference paper ${paperId} not found`);
-  }
-  const row = execToRows(results[0])[0];
-  const analysesMap = loadAnalysesMap(analysesDb, [paperId]);
-  return rowToConferencePaper(row, analysesMap);
 }
 
 export function listConferenceTracks(

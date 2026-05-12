@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getConferencePaperDetail, getPaperDetail } from '../api'
 import { usePapersStore } from './papers'
 import { useConferencePapersStore } from './conference-papers'
 import { useToastStore } from './toast'
@@ -27,31 +26,22 @@ export const useAnalysisQueueStore = defineStore('analysisQueue', () => {
         if (item.conference) {
           result = await window.api.conferenceAnalyzeFullPaper(item.id)
         } else {
-          result = await window.api.analyzeFullPaper(item.id)
+          result = await window.api.analyzeArxivFullPaper(item.id)
         }
         if (result.cancelled) return result
 
         useToastStore().show('分析完成', item.title, 'success')
 
+        // Refresh card status and bump contentVersion for detail view
         try {
           if (item.conference) {
-            const conferenceStore = useConferencePapersStore()
-            const updated = await getConferencePaperDetail(item.id)
-            const idx = conferenceStore.papers.findIndex(p => p.id === item.id)
-            if (idx !== -1) {
-              conferenceStore.papers.splice(idx, 1, updated)
-            } else if (conferenceStore.selectedPaperIds.includes(item.id)) {
-              conferenceStore.selectPaper(item.id)
-            }
+            const store = useConferencePapersStore()
+            await store.refreshStatus()
+            store.contentVersion++
           } else {
-            const papersStore = usePapersStore()
-            const updated = await getPaperDetail(item.id)
-            const idx = papersStore.papers.findIndex(p => p.id === item.id)
-            if (idx !== -1) {
-              papersStore.papers.splice(idx, 1, updated)
-            } else if (papersStore.selectedPaperIds.includes(item.id)) {
-              papersStore.selectPaper(item.id)
-            }
+            const store = usePapersStore()
+            await store.refreshStatus()
+            store.contentVersion++
           }
         } catch {
           // Non-fatal
@@ -64,7 +54,7 @@ export const useAnalysisQueueStore = defineStore('analysisQueue', () => {
     stopApi: () => {
       return queue.currentItem.value?.conference
         ? window.api.conferenceStopAnalysis()
-        : window.api.stopAnalysis()
+        : window.api.stopArxivAnalysis()
     },
   })
 

@@ -2,47 +2,47 @@ import type { Database as SqlJsDatabase } from 'sql.js';
 import { fetchFromApi, savePapers, todayStr, daysAgoStr } from '../services/arxiv-api';
 import { rebuildArxivPaperTopics } from './rebuild-arxiv-topics';
 
-export interface FailedCategory {
+export interface ArxivFailedCategory {
   category: string;
   error: string;
 }
 
-export interface FetchPapersResult {
+export interface ArxivFetchPapersResult {
   success: boolean;
   new_count: number;
   existing_count: number;
   failed_categories: string[];
-  failed_details: FailedCategory[];
+  failed_details: ArxivFailedCategory[];
 }
 
-export interface FetchPapersByDateParams {
+export interface ArxivFetchPapersByDateParams {
   startDate: string; // YYYY-MM-DD
   endDate: string;   // YYYY-MM-DD
   categories?: string[];
 }
 
-export interface FetchPapersByDateResult {
+export interface ArxivFetchPapersByDateResult {
   success: boolean;
   local_count: number;
   new_count: number;
   total_count: number;
   failed_categories: string[];
-  failed_details: FailedCategory[];
+  failed_details: ArxivFailedCategory[];
   error?: string;
 }
 
 // ── Internal shared logic ─────────────────────────────────────
 
-async function fetchPapersInRange(
+async function fetchArxivPapersInRange(
   db: SqlJsDatabase,
   paperTopicsDb: SqlJsDatabase,
   startDate: string,
   endDate: string,
   categories: string[],
-): Promise<{ new_count: number; total_count: number; failed_categories: string[]; failed_details: FailedCategory[] }> {
+): Promise<{ new_count: number; total_count: number; failed_categories: string[]; failed_details: ArxivFailedCategory[] }> {
   let totalNew = 0;
   const failed: string[] = [];
-  const failedDetails: FailedCategory[] = [];
+  const failedDetails: ArxivFailedCategory[] = [];
   const allApiIds = new Set<string>();
 
   for (const category of categories) {
@@ -71,7 +71,7 @@ async function fetchPapersInRange(
   return { new_count: totalNew, total_count: allApiIds.size, failed_categories: failed, failed_details: failedDetails };
 }
 
-function resolveCategories(db: SqlJsDatabase, categories: string[]): string[] {
+function resolveArxivCategories(db: SqlJsDatabase, categories: string[]): string[] {
   if (categories.length > 0) return categories;
   const rows = db.exec('SELECT name FROM categories WHERE enabled = TRUE');
   if (rows.length === 0) return [];
@@ -83,15 +83,15 @@ function resolveCategories(db: SqlJsDatabase, categories: string[]): string[] {
 /**
  * Fetch latest papers (yesterday + today) via arXiv API.
  */
-export async function fetchPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase, categories: string[]): Promise<FetchPapersResult> {
-  const cats = resolveCategories(db, categories);
+export async function fetchArxivPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase, categories: string[]): Promise<ArxivFetchPapersResult> {
+  const cats = resolveArxivCategories(db, categories);
   if (cats.length === 0) {
     return { success: false, new_count: 0, existing_count: 0, failed_categories: [], failed_details: [] };
   }
 
   const startDate = daysAgoStr(1);
   const endDate = todayStr();
-  const { new_count, total_count, failed_categories, failed_details } = await fetchPapersInRange(db, paperTopicsDb, startDate, endDate, cats);
+  const { new_count, total_count, failed_categories, failed_details } = await fetchArxivPapersInRange(db, paperTopicsDb, startDate, endDate, cats);
 
   return {
     success: true,
@@ -105,15 +105,15 @@ export async function fetchPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabas
 /**
  * Fetch this week's papers via arXiv API (last 7 days including today).
  */
-export async function fetchPapersThisWeek(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase, categories: string[]): Promise<FetchPapersResult> {
-  const cats = resolveCategories(db, categories);
+export async function fetchArxivPapersThisWeek(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase, categories: string[]): Promise<ArxivFetchPapersResult> {
+  const cats = resolveArxivCategories(db, categories);
   if (cats.length === 0) {
     return { success: false, new_count: 0, existing_count: 0, failed_categories: [], failed_details: [] };
   }
 
   const startDate = daysAgoStr(6);
   const endDate = todayStr();
-  const { new_count, total_count, failed_categories, failed_details } = await fetchPapersInRange(db, paperTopicsDb, startDate, endDate, cats);
+  const { new_count, total_count, failed_categories, failed_details } = await fetchArxivPapersInRange(db, paperTopicsDb, startDate, endDate, cats);
 
   return {
     success: true,
@@ -127,11 +127,11 @@ export async function fetchPapersThisWeek(db: SqlJsDatabase, paperTopicsDb: SqlJ
 /**
  * Fetch papers for a specific date range via arXiv API.
  */
-export async function fetchPapersByDate(
+export async function fetchArxivPapersByDate(
   db: SqlJsDatabase,
   paperTopicsDb: SqlJsDatabase,
-  params: FetchPapersByDateParams,
-): Promise<FetchPapersByDateResult> {
+  params: ArxivFetchPapersByDateParams,
+): Promise<ArxivFetchPapersByDateResult> {
   const { startDate, endDate } = params;
   const cats = params.categories || [];
 
@@ -139,7 +139,7 @@ export async function fetchPapersByDate(
     return { success: false, local_count: 0, new_count: 0, total_count: 0, failed_categories: [], failed_details: [] };
   }
 
-  const { new_count, total_count, failed_categories, failed_details } = await fetchPapersInRange(db, paperTopicsDb, startDate, endDate, cats);
+  const { new_count, total_count, failed_categories, failed_details } = await fetchArxivPapersInRange(db, paperTopicsDb, startDate, endDate, cats);
 
   return {
     success: true,

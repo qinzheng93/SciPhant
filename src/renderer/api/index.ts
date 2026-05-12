@@ -1,4 +1,4 @@
-import type { PaperWithAnalysis } from '../types/paper'
+import type { Paper } from '../types/paper'
 import type { Topic, LLMConfig, OutputConfig, ZoteroConfig, Category } from '../types/config'
 
 export interface PaginatedResult<T> {
@@ -15,14 +15,14 @@ export interface FetchDate {
 }
 
 // Paper API
-export const listPapers = async (params: {
+export const listArxivPapers = async (params: {
   topicIds?: number[]
   search?: string
   fetchDate?: string
   page?: number
   pageSize?: number
-}): Promise<PaginatedResult<PaperWithAnalysis>> => {
-  return window.api.listPapers({
+}): Promise<PaginatedResult<Paper>> => {
+  return window.api.listArxivPapers({
     topicIds: params.topicIds,
     search: params.search,
     fetchDate: params.fetchDate,
@@ -31,8 +31,12 @@ export const listPapers = async (params: {
   })
 }
 
-export const getPaperDetail = async (paperId: string): Promise<PaperWithAnalysis> => {
-  return window.api.getPaperDetail(paperId)
+export const checkArxivSummaryStatus = async (ids: string[]): Promise<Record<string, boolean>> => {
+  return window.api.checkArxivSummaryStatus(ids)
+}
+
+export const getArxivSummary = async (id: string): Promise<string | null> => {
+  return window.api.getArxivSummary(id)
 }
 
 // Config API
@@ -71,18 +75,14 @@ export const updateConfig = async (config: {
 }
 
 // Fetch dates API
-export const listFetchDates = async (): Promise<FetchDate[]> => {
-  return window.api.listFetchDates()
+export const listArxivFetchDates = async (): Promise<FetchDate[]> => {
+  return window.api.listArxivFetchDates()
 }
 
 export interface TopicCount {
   topic_id: number
   name: string
   count: number
-}
-
-export const listTopicCounts = async (): Promise<TopicCount[]> => {
-  return window.api.listTopicCounts()
 }
 
 // Category API
@@ -103,66 +103,58 @@ export const deleteCategory = async (categoryId: number): Promise<void> => {
 }
 
 // Fetch API
-export interface FailedCategory {
+export interface ArxivFailedCategory {
   category: string
   error: string
 }
 
-export interface FetchPapersResult {
+export interface ArxivFetchPapersResult {
   success: boolean
   new_count: number
   existing_count: number
   failed_categories: string[]
-  failed_details: FailedCategory[]
+  failed_details: ArxivFailedCategory[]
 }
 
-export const openPdf = async (paperId: string): Promise<void> => {
-  return window.api.openPdf(paperId)
+export const openArxivPdf = async (paperId: string): Promise<void> => {
+  return window.api.openArxivPdf(paperId)
 }
 
-export const fetchPapers = async (categories?: string[]): Promise<FetchPapersResult> => {
-  return window.api.fetchPapers(categories)
+export const fetchArxivPapers = async (categories?: string[]): Promise<ArxivFetchPapersResult> => {
+  return window.api.fetchArxivPapers(categories)
 }
 
-export const fetchPapersThisWeek = async (categories?: string[]): Promise<FetchPapersResult> => {
-  return window.api.fetchPapersThisWeek(categories)
+export const fetchArxivPapersThisWeek = async (categories?: string[]): Promise<ArxivFetchPapersResult> => {
+  return window.api.fetchArxivPapersThisWeek(categories)
 }
 
-export interface FetchPapersByDateParams {
+export interface ArxivFetchPapersByDateParams {
   startDate: string
   endDate: string
   categories?: string[]
 }
 
-export interface FetchPapersByDateResult {
+export interface ArxivFetchPapersByDateResult {
   success: boolean
   local_count: number
   new_count: number
   total_count: number
   failed_categories: string[]
-  failed_details: FailedCategory[]
+  failed_details: ArxivFailedCategory[]
   error?: string
 }
 
-export const fetchPapersByDate = async (params: FetchPapersByDateParams): Promise<FetchPapersByDateResult> => {
-  return window.api.fetchPapersByDate(params)
+export const fetchArxivPapersByDate = async (params: ArxivFetchPapersByDateParams): Promise<ArxivFetchPapersByDateResult> => {
+  return window.api.fetchArxivPapersByDate(params)
 }
 
 // Summary API
-export const summarizePaper = async (paperId: string, skipIfAnalyzed = true): Promise<{ success: boolean; summary: string | null; skipped?: boolean }> => {
-  return window.api.summarizePaper(paperId, skipIfAnalyzed)
+export const summarizeArxivPaper = async (paperId: string, skipIfAnalyzed = true): Promise<{ success: boolean; summary: string | null; skipped?: boolean }> => {
+  return window.api.summarizeArxivPaper(paperId, skipIfAnalyzed)
 }
 
-export const summarizeAllUnanalyzed = async (): Promise<{ success: boolean; analyzed?: number; errors?: number; stopped?: boolean; message?: string }> => {
-  return window.api.summarizeAllUnanalyzed()
-}
-
-export const stopSummary = async (): Promise<{ success: boolean }> => {
-  return window.api.stopSummary()
-}
-
-export const getUnanalyzedPaperIds = async (): Promise<{ id: string; title: string }[]> => {
-  return window.api.getUnanalyzedPaperIds()
+export const stopArxivSummary = async (): Promise<{ success: boolean }> => {
+  return window.api.stopArxivSummary()
 }
 
 export const testLLMConnection = async (): Promise<{ success: boolean; message: string }> => {
@@ -174,20 +166,16 @@ export const testZoteroConnection = async (): Promise<{ success: boolean; messag
 }
 
 // Analysis API (full paper)
-export const analyzeFullPaper = async (paperId: string): Promise<{ success: boolean; cancelled?: boolean }> => {
-  return window.api.analyzeFullPaper(paperId)
+export const analyzeArxivFullPaper = async (paperId: string): Promise<{ success: boolean; cancelled?: boolean }> => {
+  return window.api.analyzeArxivFullPaper(paperId)
 }
 
-export const getPaperAnalysis = async (paperId: string): Promise<string | null> => {
-  return window.api.getPaperAnalysis(paperId)
+export const getArxivAnalysis = async (paperId: string): Promise<string | null> => {
+  return window.api.getArxivAnalysis(paperId)
 }
 
-export const getUnanalyzedAnalysisPapers = async (): Promise<{ id: string; title: string }[]> => {
-  return window.api.getUnanalyzedAnalysisPapers()
-}
-
-export const stopAnalysis = async (): Promise<{ success: boolean }> => {
-  return window.api.stopAnalysis()
+export const stopArxivAnalysis = async (): Promise<{ success: boolean }> => {
+  return window.api.stopArxivAnalysis()
 }
 
 export const clearData = async (): Promise<{ success: boolean }> => {
@@ -236,12 +224,16 @@ export const listConferencePapers = async (params: {
   })
 }
 
-export const getConferencePaperDetail = async (paperId: string): Promise<ConferencePaper> => {
-  return window.api.getConferencePaperDetail(paperId)
-}
-
 export const listConferenceTracks = async (conferenceId: number): Promise<{ track: string; count: number }[]> => {
   return window.api.listConferenceTracks(conferenceId)
+}
+
+export const conferenceCheckPapersSummaryStatus = async (ids: string[]): Promise<Record<string, boolean>> => {
+  return window.api.conferenceCheckPapersSummaryStatus(ids)
+}
+
+export const conferenceGetPaperSummary = async (id: string): Promise<string | null> => {
+  return window.api.conferenceGetPaperSummary(id)
 }
 
 export const conferenceSummarizePaper = async (paperId: string, skipIfAnalyzed = true): Promise<{ success: boolean; summary: string | null; skipped?: boolean; cancelled?: boolean }> => {
@@ -250,10 +242,6 @@ export const conferenceSummarizePaper = async (paperId: string, skipIfAnalyzed =
 
 export const conferenceStopSummary = async (): Promise<{ success: boolean }> => {
   return window.api.conferenceStopSummary()
-}
-
-export const conferenceGetUnanalyzedIds = async (): Promise<{ id: string; title: string }[]> => {
-  return window.api.conferenceGetUnanalyzedIds()
 }
 
 export const conferenceAnalyzeFullPaper = async (paperId: string): Promise<{ success: boolean; cancelled?: boolean }> => {

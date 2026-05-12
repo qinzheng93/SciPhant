@@ -1,137 +1,68 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import initSqlJs from 'sql.js';
-import type { Database as SqlJsDatabase } from 'sql.js';
-import { getUnsummarizedPapers, stopSummary, setSummaryAbortController } from '../summary';
-import { stopAnalysis, setAnalysisAbortController } from '../analysis';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { stopArxivSummary, setArxivSummaryAbortController } from '../arxiv-summary';
+import { stopArxivAnalysis, setArxivAnalysisAbortController, getArxivPaperAnalysis } from '../arxiv-analysis';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS papers (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  authors TEXT NOT NULL,
-  abstract_text TEXT NOT NULL,
-  url TEXT NOT NULL,
-  pdf_url TEXT NOT NULL,
-  published_date TEXT NOT NULL,
-  updated_date TEXT NOT NULL,
-  categories TEXT NOT NULL,
-  fetched_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS analyses (
-  paper_id TEXT PRIMARY KEY,
-  summary TEXT DEFAULT '',
-  analysis TEXT DEFAULT '',
-  FOREIGN KEY (paper_id) REFERENCES papers(id)
-);
-`;
-
-const TOPICS_SCHEMA = `
-CREATE TABLE IF NOT EXISTS arxiv_paper_topics (
-  paper_id TEXT NOT NULL,
-  topic_id INTEGER NOT NULL,
-  PRIMARY KEY (paper_id, topic_id)
-);
-`;
-
-function insertPaper(db: SqlJsDatabase, id: string, title: string) {
-  db.run(
-    `INSERT INTO papers (id, title, authors, abstract_text, url, pdf_url, published_date, updated_date, categories, fetched_at)
-     VALUES (?, ?, '[]', '', '', '', '2024-03-10', '2024-03-10', '[]', '2024-03-10')`,
-    [id, title],
-  );
+function createDataDir(): string {
+  return mkdtempSync(join(tmpdir(), 'summary-test-'));
 }
 
-describe('getUnsummarizedPapers', () => {
-  let SQL: any;
-  let db: SqlJsDatabase;
-  let topicsDb: SqlJsDatabase;
-
-  beforeAll(async () => {
-    SQL = await initSqlJs({
-      locateFile: () => 'node_modules/sql.js/dist/sql-wasm.wasm',
-    });
-    (globalThis as any).__testSQL = SQL;
-  });
-
-  beforeEach(() => {
-    db = new SQL.Database();
-    db.run(SCHEMA);
-    topicsDb = new SQL.Database();
-    topicsDb.run(TOPICS_SCHEMA);
-  });
-
-  it('returns papers with topic associations that have no summary', () => {
-    topicsDb.run("INSERT INTO arxiv_paper_topics VALUES ('1', 1)");
-    topicsDb.run("INSERT INTO arxiv_paper_topics VALUES ('2', 1)");
-    insertPaper(db, '1', 'Paper A');
-    insertPaper(db, '2', 'Paper B');
-    insertPaper(db, '3', 'Paper C'); // no topic association
-    db.run("INSERT INTO analyses VALUES ('1', 'Summary text', '')");
-
-    const result = getUnsummarizedPapers(db, topicsDb);
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('2');
-  });
-
-  it('includes papers with empty summary', () => {
-    topicsDb.run("INSERT INTO arxiv_paper_topics VALUES ('1', 1)");
-    insertPaper(db, '1', 'Paper A');
-    db.run("INSERT INTO analyses VALUES ('1', '', '')");
-
-    const result = getUnsummarizedPapers(db, topicsDb);
-    expect(result).toHaveLength(1);
-  });
-
-  it('includes papers with failed summary', () => {
-    topicsDb.run("INSERT INTO arxiv_paper_topics VALUES ('1', 1)");
-    insertPaper(db, '1', 'Paper A');
-    db.run("INSERT INTO analyses VALUES ('1', 'SUMMARY_FAILED: timeout', '')");
-
-    const result = getUnsummarizedPapers(db, topicsDb);
-    expect(result).toHaveLength(1);
-  });
-
-  it('excludes papers without topic associations', () => {
-    insertPaper(db, '1', 'Paper A'); // no entry in arxiv_paper_topics
-
-    const result = getUnsummarizedPapers(db, topicsDb);
-    expect(result).toHaveLength(0);
-  });
-
-  it('returns empty when no papers exist', () => {
-    expect(getUnsummarizedPapers(db, topicsDb)).toEqual([]);
-  });
-});
-
 describe('summary abort controller', () => {
-  it('stopSummary returns success', () => {
-    expect(stopSummary()).toEqual({ success: true });
+  it('stopArxivSummary returns success', () => {
+    expect(stopArxivSummary()).toEqual({ success: true });
   });
 
-  it('setSummaryAbortController sets and clears controller', () => {
+  it('setArxivSummaryAbortController sets and clears controller', () => {
     const ctrl = new AbortController();
-    setSummaryAbortController(ctrl);
-    stopSummary(); // should abort
+    setArxivSummaryAbortController(ctrl);
+    stopArxivSummary(); // should abort
     expect(ctrl.signal.aborted).toBe(true);
-    setSummaryAbortController(null);
+    setArxivSummaryAbortController(null);
   });
 });
 
 describe('analysis abort controller', () => {
-  it('stopAnalysis returns success when no controller', () => {
-    expect(stopAnalysis()).toEqual({ success: true });
+  it('stopArxivAnalysis returns success when no controller', () => {
+    expect(stopArxivAnalysis()).toEqual({ success: true });
   });
 
-  it('stopAnalysis aborts the controller', () => {
+  it('stopArxivAnalysis aborts the controller', () => {
     const ctrl = new AbortController();
-    setAnalysisAbortController(ctrl);
-    stopAnalysis();
+    setArxivAnalysisAbortController(ctrl);
+    stopArxivAnalysis();
     expect(ctrl.signal.aborted).toBe(true);
     // Controller should be cleared
-    stopAnalysis(); // should not throw
+    stopArxivAnalysis(); // should not throw
   });
 
-  it('setAnalysisAbortController can set null', () => {
-    expect(() => setAnalysisAbortController(null)).not.toThrow();
+  it('setArxivAnalysisAbortController can set null', () => {
+    expect(() => setArxivAnalysisAbortController(null)).not.toThrow();
+  });
+});
+
+describe('getArxivPaperAnalysis', () => {
+  let dataDir: string;
+
+  beforeEach(() => {
+    dataDir = createDataDir();
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('returns null when no analysis file exists', async () => {
+    const result = await getArxivPaperAnalysis(dataDir, 'nonexistent');
+    expect(result).toBeNull();
+  });
+
+  it('returns analysis content when file exists', async () => {
+    mkdirSync(join(dataDir, 'analyses', 'arXiv'), { recursive: true });
+    writeFileSync(join(dataDir, 'analyses', 'arXiv', '123.md'), '# Analysis\nContent here');
+
+    const result = await getArxivPaperAnalysis(dataDir, '123');
+    expect(result).toBe('# Analysis\nContent here');
   });
 });

@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import { getConferencePaperDetail, getPaperDetail } from '../api'
 import { usePapersStore } from './papers'
 import { useConferencePapersStore } from './conference-papers'
 import { useProgressStore } from './progress'
@@ -21,34 +20,25 @@ export const useSummaryQueueStore = defineStore('summaryQueue', () => {
       if (item.conference) {
         result = await window.api.conferenceSummarizePaper(item.id, false)
       } else {
-        result = await window.api.summarizePaper(item.id, false)
+        result = await window.api.summarizeArxivPaper(item.id, false)
       }
       if (result.cancelled) return result
 
       useToastStore().show('总结完成', item.title, 'success')
 
+      // Refresh card status and bump contentVersion for detail view
       try {
         if (item.conference) {
-          const conferenceStore = useConferencePapersStore()
-          const updated = await getConferencePaperDetail(item.id)
-          const idx = conferenceStore.papers.findIndex(p => p.id === item.id)
-          if (idx !== -1) {
-            conferenceStore.papers.splice(idx, 1, updated)
-          } else if (conferenceStore.selectedPaperIds.includes(item.id)) {
-            conferenceStore.selectPaper(item.id)
-          }
+          const store = useConferencePapersStore()
+          await store.refreshStatus()
+          store.contentVersion++
         } else {
-          const papersStore = usePapersStore()
-          const updated = await getPaperDetail(item.id)
-          const idx = papersStore.papers.findIndex(p => p.id === item.id)
-          if (idx !== -1) {
-            papersStore.papers.splice(idx, 1, updated)
-          } else if (papersStore.selectedPaperIds.includes(item.id)) {
-            papersStore.selectPaper(item.id)
-          }
+          const store = usePapersStore()
+          await store.refreshStatus()
+          store.contentVersion++
         }
       } catch {
-        // Non-fatal: list refresh failed
+        // Non-fatal: status refresh failed
       }
 
       updateProgress()
@@ -56,14 +46,7 @@ export const useSummaryQueueStore = defineStore('summaryQueue', () => {
     stopApi: () => {
       return queue.currentItem.value?.conference
         ? window.api.conferenceStopSummary()
-        : window.api.stopSummary()
-    },
-    onCompleteAll: async () => {
-      if (queue.currentItem.value?.conference) {
-        await useConferencePapersStore().loadPapers()
-      } else {
-        await usePapersStore().loadPapers()
-      }
+        : window.api.stopArxivSummary()
     },
   })
 

@@ -2,8 +2,8 @@
   <div class="paper-card" :class="{ selected: isPaperSelected }" @click="onCardClick">
     <div class="card-header">
       <h3 class="paper-title">{{ paper.title }}</h3>
-      <span class="status-indicator" :class="{ analyzed: isAnalyzed(paper), failed: isFailedAnalysis(paper) }">
-        {{ isAnalyzed(paper) ? '已分析' : isFailedAnalysis(paper) ? '分析失败' : '未分析' }}
+      <span class="status-indicator" :class="{ analyzed: isSummarized }">
+        {{ isSummarized ? '已总结' : '未总结' }}
       </span>
     </div>
     <div class="card-middle">
@@ -21,11 +21,10 @@ import { computed } from 'vue'
 import { usePapersStore } from '../../stores/papers'
 import { useConferencePapersStore } from '../../stores/conference-papers'
 import { useModeStore } from '../../stores/mode'
-import type { PaperWithAnalysis } from '../../types/paper'
-import { isAnalyzed, isFailedAnalysis } from '../../types/paper'
+import type { Paper } from '../../types/paper'
 import { formatDate } from '../../utils/format'
 
-type PaperLike = PaperWithAnalysis | ConferencePaper
+type PaperLike = Paper | ConferencePaper
 
 function isConferencePaper(paper: PaperLike): paper is ConferencePaper {
   return 'conference_id' in paper
@@ -48,6 +47,13 @@ const isPaperSelected = computed(() => {
     ? conferenceStore.selectedPaperIds
     : papersStore.selectedPaperIds
   return ids.includes(props.paper.id)
+})
+
+const isSummarized = computed(() => {
+  const set = modeStore.isConference
+    ? conferenceStore.summarizedIds
+    : papersStore.summarizedIds
+  return set.has(props.paper.id)
 })
 
 const onCardClick = (e: MouseEvent) => {

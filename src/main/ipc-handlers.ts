@@ -2,16 +2,14 @@ import { ipcMain, dialog, app, shell } from 'electron';
 import * as fs from 'fs/promises';
 import type { BrowserWindow } from 'electron';
 import type { Database } from './database/connection';
-import type { ConferenceAnalysesDb } from './database/conference-analyses';
 import type { SettingsDb } from './database/settings';
 import type { PaperTopicsDb } from './database/paper-topics';
-import * as paperCmd from './commands/paper';
+import * as arxivPaperCmd from './commands/arxiv-paper';
 import * as configCmd from './commands/config';
-import * as fetchCmd from './commands/fetch';
-import * as summaryCmd from './commands/summary';
-import * as analysisCmd from './commands/analysis';
+import * as arxivFetchCmd from './commands/arxiv-fetch';
+import * as arxivSummaryCmd from './commands/arxiv-summary';
+import * as arxivAnalysisCmd from './commands/arxiv-analysis';
 import * as llmCmd from './commands/llm';
-import * as paperAnalyzerCmd from './services/paper-analyzer';
 import * as rebuildArxivTopics from './commands/rebuild-arxiv-topics';
 import * as rebuildConferenceTopics from './commands/rebuild-conference-topics';
 import * as conferencePaperCmd from './commands/conference-paper';
@@ -20,6 +18,16 @@ import * as conferenceAnalysisCmd from './commands/conference-analysis';
 import { ensurePdfDownloaded, getPdfPath } from './services/pdf-extractor';
 import { fetchCollections, createItem, createChildItems, type ChildItemPayload } from './services/zotero-client';
 import { loadZoteroConfig } from './commands/config';
+import {
+  deleteAnalysisFile,
+  clearAllAnalysisFiles,
+} from './services/analysis-files';
+import { checkArxivSummaryStatus, getArxivSummaryContent } from './commands/arxiv-summary';
+import {
+  getCategoryForConference,
+  checkConferenceSummaryStatus,
+  getConferenceSummaryContent,
+} from './commands/conference-summary';
 
 function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
   ipcMain.handle(channel, async (event, ...args) => {
@@ -35,16 +43,15 @@ function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
 export function registerIpcHandlers(
   db: Database,
   conferenceDb: Database,
-  conferenceAnalysesDb: ConferenceAnalysesDb,
   settingsDb: SettingsDb,
   paperTopicsDb: PaperTopicsDb,
   mainWindow: BrowserWindow,
 ): void {
   const sqlDb = db.getDb();
   const sqlConferenceDb = conferenceDb.getDb();
-  const sqlAnalysesDb = conferenceAnalysesDb.getDb();
   const sqlSettingsDb = settingsDb.getDb();
   const sqlPaperTopicsDb = paperTopicsDb.getDb();
+  const dataDir = app.getPath('userData');
 
   // Serial queue for topic association updates
   let topicQueueChain = Promise.resolve();
@@ -54,10 +61,10 @@ export function registerIpcHandlers(
   };
 
   // Paper (read-only)
-  handle('list-papers', async (params) => paperCmd.listPapers(sqlDb, sqlPaperTopicsDb, params));
-  handle('get-paper-detail', async (paperId) => paperCmd.getPaperDetail(sqlDb, paperId));
-  handle('list-fetch-dates', async () => paperCmd.listFetchDates(sqlDb));
-  handle('list-topic-counts', async () => paperCmd.listTopicCounts(sqlPaperTopicsDb));
+  handle('arxiv:list-papers', async (params) => arxivPaperCmd.listArxivPapers(sqlDb, sqlPaperTopicsDb, params));
+  handle('arxiv:list-fetch-dates', async () => arxivPaperCmd.listArxivFetchDates(sqlDb));
+  handle('arxiv:check-papers-summary-status', async (paperIds: string[]) => checkArxivSummaryStatus(dataDir, paperIds));
+  handle('arxiv:get-paper-summary', async (paperId: string) => getArxivSummaryContent(dataDir, paperId));
 
   // Config
   handle('list-topics', async () => configCmd.listTopics(sqlPaperTopicsDb));
@@ -112,37 +119,39 @@ export function registerIpcHandlers(
   });
   handle('clear-data', async () => {
     const result = configCmd.clearData(sqlDb);
+    await clearAllAnalysisFiles(dataDir);
     await db.save();
     return result;
   });
   handle('clear-analyses', async () => {
     const result = configCmd.clearAnalyses(sqlDb);
+    await clearAllAnalysisFiles(dataDir);
     await db.save();
     return result;
   });
   handle('test-zotero-connection', async () => configCmd.testZoteroConnection(sqlSettingsDb));
 
   // Fetch
-  handle('fetch-papers', async (categories) => {
-    const result = await fetchCmd.fetchPapers(sqlDb, sqlPaperTopicsDb, categories || []);
+  handle('arxiv:fetch-papers', async (categories) => {
+    const result = await arxivFetchCmd.fetchArxivPapers(sqlDb, sqlPaperTopicsDb, categories || []);
     await db.save();
     await paperTopicsDb.save();
     return result;
   });
-  handle('fetch-papers-this-week', async (categories) => {
-    const result = await fetchCmd.fetchPapersThisWeek(sqlDb, sqlPaperTopicsDb, categories || []);
+  handle('arxiv:fetch-papers-this-week', async (categories) => {
+    const result = await arxivFetchCmd.fetchArxivPapersThisWeek(sqlDb, sqlPaperTopicsDb, categories || []);
     await db.save();
     await paperTopicsDb.save();
     return result;
   });
-  ipcMain.handle('fetch-papers-by-date', async (_event, params) => {
+  ipcMain.handle('arxiv:fetch-papers-by-date', async (_event, params) => {
     try {
-      const result = await fetchCmd.fetchPapersByDate(sqlDb, sqlPaperTopicsDb, params);
+      const result = await arxivFetchCmd.fetchArxivPapersByDate(sqlDb, sqlPaperTopicsDb, params);
       await db.save();
       await paperTopicsDb.save();
       return result;
     } catch (err) {
-      console.error('[IPC] fetch-papers-by-date error:', err);
+      console.error('[IPC] arxiv:fetch-papers-by-date error:', err);
       const message = err instanceof Error ? err.message : String(err);
       return {
         success: false,
@@ -157,11 +166,11 @@ export function registerIpcHandlers(
   });
 
   // Summary (shallow analysis)
-  ipcMain.handle('summarize-paper', async (_event, paperId, skipIfAnalyzed) => {
+  ipcMain.handle('arxiv:summarize-paper', async (_event, paperId, skipIfAnalyzed) => {
     const controller = new AbortController();
-    summaryCmd.setSummaryAbortController(controller);
+    arxivSummaryCmd.setArxivSummaryAbortController(controller);
     try {
-      const result = await summaryCmd.summarizePaper(sqlDb, sqlSettingsDb, sqlPaperTopicsDb, paperId, skipIfAnalyzed, controller.signal);
+      const result = await arxivSummaryCmd.summarizeArxivPaper(sqlDb, sqlSettingsDb, sqlPaperTopicsDb, dataDir, paperId, skipIfAnalyzed, controller.signal);
       await db.save();
       await paperTopicsDb.save();
       return result;
@@ -171,22 +180,14 @@ export function registerIpcHandlers(
       }
       throw err;
     } finally {
-      summaryCmd.setSummaryAbortController(null);
+      arxivSummaryCmd.setArxivSummaryAbortController(null);
     }
   });
-  handle('summarize-all-unanalyzed', async () => {
-    const result = await summaryCmd.summarizeAllUnanalyzed(sqlDb, sqlSettingsDb, sqlPaperTopicsDb, mainWindow, async () => {
-      await db.save();
-      await paperTopicsDb.save();
-    });
-    return result;
-  });
-  handle('stop-summary', async () => summaryCmd.stopSummary());
-  handle('get-unanalyzed-paper-ids', async () => summaryCmd.getUnsummarizedPapers(sqlDb, sqlPaperTopicsDb));
+  handle('arxiv:stop-summary', async () => arxivSummaryCmd.stopArxivSummary());
   handle('test-llm-connection', async () => llmCmd.testLLMConnection(sqlSettingsDb));
 
   // PDF download
-  handle('download-pdf', async (paperId) => {
+  handle('arxiv:download-pdf', async (paperId) => {
     const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) {
       throw new Error(`Paper ${paperId} not found`);
@@ -201,7 +202,7 @@ export function registerIpcHandlers(
     return filePath;
   });
 
-  handle('open-pdf', async (paperId) => {
+  handle('arxiv:open-pdf', async (paperId) => {
     const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) return;
     const pdfUrl = results[0].values[0][0] as string;
@@ -210,7 +211,7 @@ export function registerIpcHandlers(
     await shell.openPath(localPath);
   });
 
-  handle('is-pdf-cached', async (paperId) => {
+  handle('arxiv:is-pdf-cached', async (paperId) => {
     const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) return false;
     const pdfUrl = results[0].values[0][0] as string;
@@ -224,7 +225,7 @@ export function registerIpcHandlers(
     }
   });
 
-  handle('delete-pdf', async (paperId) => {
+  handle('arxiv:delete-pdf', async (paperId) => {
     const results = sqlDb.exec('SELECT pdf_url FROM papers WHERE id = ?', [paperId]);
     if (results.length === 0 || results[0].values.length === 0) return;
     const pdfUrl = results[0].values[0][0] as string;
@@ -235,25 +236,22 @@ export function registerIpcHandlers(
     } catch { /* ignore */ }
   });
 
-  handle('delete-summary', async (paperId) => {
-    sqlDb.exec('UPDATE analyses SET summary = \'\' WHERE paper_id = ?', [paperId]);
-    await db.save();
+  handle('arxiv:delete-summary', async (paperId) => {
+    await deleteAnalysisFile(dataDir, 'summaries', 'arXiv', paperId);
   });
 
-  handle('delete-analysis', async (paperId) => {
-    sqlDb.exec('UPDATE analyses SET analysis = \'\' WHERE paper_id = ?', [paperId]);
-    await db.save();
+  handle('arxiv:delete-analysis', async (paperId) => {
+    await deleteAnalysisFile(dataDir, 'analyses', 'arXiv', paperId);
   });
 
   // Analysis (full paper)
-  ipcMain.handle('analyze-full-paper', async (_event, paperId) => {
+  ipcMain.handle('arxiv:analyze-full-paper', async (_event, paperId) => {
     const controller = new AbortController();
-    analysisCmd.setAnalysisAbortController(controller);
+    arxivAnalysisCmd.setArxivAnalysisAbortController(controller);
     try {
-      const result = await paperAnalyzerCmd.analyzeFullPaper(sqlDb, sqlSettingsDb, paperId, controller.signal, app.getPath('userData'), (phase) => {
+      const result = await arxivAnalysisCmd.analyzeArxivFullPaper(sqlDb, sqlSettingsDb, dataDir, paperId, controller.signal, (phase) => {
         mainWindow.webContents.send('analysis-progress', phase);
       });
-      await db.save();
       return result;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -262,12 +260,11 @@ export function registerIpcHandlers(
       console.error(`[Analysis] FAILED for paper ${paperId}:`, err);
       throw err;
     } finally {
-      analysisCmd.setAnalysisAbortController(null);
+      arxivAnalysisCmd.setArxivAnalysisAbortController(null);
     }
   });
-  handle('get-paper-analysis', async (paperId) => paperAnalyzerCmd.getPaperAnalysis(sqlDb, paperId));
-  handle('get-unanalyzed-analysis-papers', async () => paperAnalyzerCmd.getUnanalyzedPapers(sqlDb));
-  handle('stop-analysis', async () => analysisCmd.stopAnalysis());
+  handle('arxiv:get-paper-analysis', async (paperId) => arxivAnalysisCmd.getArxivPaperAnalysis(dataDir, paperId));
+  handle('arxiv:stop-analysis', async () => arxivAnalysisCmd.stopArxivAnalysis());
 
   // Zotero
   handle('list-zotero-collections', async () => {
@@ -379,10 +376,13 @@ export function registerIpcHandlers(
   // Conference papers (read-only from bundled DB)
   handle('conference:list-conferences', async () => conferencePaperCmd.listConferences(sqlConferenceDb));
   handle('conference:list-papers', async (params) =>
-    conferencePaperCmd.listConferencePapers(sqlConferenceDb, sqlAnalysesDb, sqlDb, sqlPaperTopicsDb, params),
+    conferencePaperCmd.listConferencePapers(sqlConferenceDb, sqlDb, sqlPaperTopicsDb, params),
   );
-  handle('conference:get-paper-detail', async (paperId) =>
-    conferencePaperCmd.getConferencePaperDetail(sqlConferenceDb, sqlAnalysesDb, paperId),
+  handle('conference:check-papers-summary-status', async (paperIds: string[]) =>
+    checkConferenceSummaryStatus(sqlConferenceDb, dataDir, paperIds),
+  );
+  handle('conference:get-paper-summary', async (paperId: string) =>
+    getConferenceSummaryContent(sqlConferenceDb, dataDir, paperId),
   );
   handle('conference:list-tracks', async (conferenceId) =>
     conferencePaperCmd.listConferenceTracks(sqlConferenceDb, conferenceId),
@@ -394,9 +394,8 @@ export function registerIpcHandlers(
     conferenceSummaryCmd.setConferenceSummaryAbortController(controller);
     try {
       const result = await conferenceSummaryCmd.summarizeConferencePaper(
-        sqlConferenceDb, sqlAnalysesDb, sqlSettingsDb, paperId, skipIfAnalyzed, controller.signal,
+        sqlConferenceDb, sqlSettingsDb, sqlPaperTopicsDb, dataDir, paperId, skipIfAnalyzed, controller.signal,
       );
-      await conferenceAnalysesDb.save();
       return result;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -408,9 +407,6 @@ export function registerIpcHandlers(
     }
   });
   handle('conference:stop-summary', async () => conferenceSummaryCmd.stopConferenceSummary());
-  handle('conference:get-unanalyzed-ids', async () =>
-    conferenceSummaryCmd.getUnsummarizedConferencePapers(sqlConferenceDb, sqlAnalysesDb),
-  );
 
   // Conference analysis (full paper)
   ipcMain.handle('conference:analyze-full-paper', async (_event, paperId) => {
@@ -418,12 +414,11 @@ export function registerIpcHandlers(
     conferenceAnalysisCmd.setConferenceAnalysisAbortController(controller);
     try {
       const result = await conferenceAnalysisCmd.analyzeConferenceFullPaper(
-        sqlConferenceDb, sqlAnalysesDb, sqlSettingsDb, paperId, controller.signal,
-        app.getPath('userData'), (phase) => {
+        sqlConferenceDb, sqlSettingsDb, dataDir, paperId, controller.signal,
+        (phase) => {
           mainWindow.webContents.send('analysis-progress', phase);
         },
       );
-      await conferenceAnalysesDb.save();
       return result;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -435,7 +430,7 @@ export function registerIpcHandlers(
     }
   });
   handle('conference:get-paper-analysis', async (paperId) =>
-    conferenceAnalysisCmd.getConferencePaperAnalysis(sqlAnalysesDb, paperId),
+    conferenceAnalysisCmd.getConferencePaperAnalysis(sqlConferenceDb, dataDir, paperId),
   );
   handle('conference:stop-analysis', async () => conferenceAnalysisCmd.stopConferenceAnalysis());
 
@@ -471,13 +466,17 @@ export function registerIpcHandlers(
   });
 
   handle('conference:delete-summary', async (paperId) => {
-    sqlAnalysesDb.exec('UPDATE analyses SET summary = \'\' WHERE paper_id = ?', [paperId]);
-    await conferenceAnalysesDb.save();
+    const category = getCategoryForConference(sqlConferenceDb, paperId);
+    if (category) {
+      await deleteAnalysisFile(dataDir, 'summaries', category, paperId);
+    }
   });
 
   handle('conference:delete-analysis', async (paperId) => {
-    sqlAnalysesDb.exec('UPDATE analyses SET analysis = \'\' WHERE paper_id = ?', [paperId]);
-    await conferenceAnalysesDb.save();
+    const category = getCategoryForConference(sqlConferenceDb, paperId);
+    if (category) {
+      await deleteAnalysisFile(dataDir, 'analyses', category, paperId);
+    }
   });
 
   // Conference Zotero export

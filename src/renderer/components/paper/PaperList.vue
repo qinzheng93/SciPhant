@@ -71,7 +71,7 @@
           v-for="paper in activeStore.papers"
           :key="paper.id"
           :paper="paper"
-          @select="selectPaper"
+
         />
 
         <div v-if="loadingMore" class="loading-more">
@@ -108,12 +108,6 @@ const hasMore = computed(() => {
 const enabledTopics = computed(() => {
   return configStore.topics.filter(t => t.enabled)
 })
-
-const emit = defineEmits<{
-  (e: 'select', paperId: string): void
-}>()
-
-const selectPaper = (paperId: string) => emit('select', paperId)
 
 const loadMore = async () => {
   if (loadingMore.value || !hasMore.value) return
@@ -156,7 +150,7 @@ const retry = () => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 0 24px;
+  padding: 0;
 }
 
 .filter-row {

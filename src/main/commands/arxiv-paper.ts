@@ -1,6 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 
-export interface PaperWithAnalysis {
+export interface Paper {
   id: string;
   title: string;
   authors: string[];
@@ -11,35 +11,27 @@ export interface PaperWithAnalysis {
   updated_date: string;
   categories: string[];
   fetched_at: string;
-  summary: string | null;
-  analysis: string | null;
 }
 
-export interface PaginatedResult {
-  items: PaperWithAnalysis[];
+interface PaginatedResult {
+  items: Paper[];
   total: number;
   page: number;
   page_size: number;
 }
 
-export interface FetchDate {
+interface FetchDate {
   date: string;
   display: string;
   count: number;
 }
 
-export interface TopicCount {
-  topic_id: number;
-  name: string;
-  count: number;
-}
-
-import { BASE_SQL, rowToPaper, execResultToPaperRows } from './paper-shared';
+import { BASE_SQL, rowToPaper, execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared';
 
 /**
  * List papers with pagination and filtering.
  */
-export function listPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase | null, params: {
+export function listArxivPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase | null, params: {
   topicIds?: number[];
   topicId?: number;
   search?: string;
@@ -56,8 +48,7 @@ export function listPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase | nul
   const bindValues: unknown[] = [];
 
   if (params.search) {
-    const escaped = params.search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-    const pattern = `%${escaped}%`;
+    const pattern = buildSearchPattern(params.search);
     conditions.push("(p.title LIKE ? ESCAPE '\\' OR p.abstract_text LIKE ? ESCAPE '\\')");
     bindValues.push(pattern, pattern);
   }
@@ -72,25 +63,13 @@ export function listPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase | nul
     : params.topicId != null ? [params.topicId] : [];
 
   if (topicIds.length > 0 && paperTopicsDb) {
-    const placeholders = topicIds.map(() => '?').join(',');
-    const ptResults = paperTopicsDb.exec(
-      `SELECT DISTINCT paper_id FROM arxiv_paper_topics WHERE topic_id IN (${placeholders})`,
-      topicIds,
-    );
-    if (ptResults.length > 0 && ptResults[0].values.length > 0) {
-      const paperIds = ptResults[0].values.map(r => r[0] as string);
-      conditions.push(`p.id IN (${paperIds.map(() => '?').join(',')})`);
-      bindValues.push(...paperIds);
-    } else {
-      // No matching papers
-      conditions.push('1 = 0');
-    }
+    filterByTopicIds(paperTopicsDb, 'arxiv_paper_topics', topicIds, conditions, bindValues);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // Count total
-  const countSql = `SELECT COUNT(*) FROM papers p LEFT JOIN analyses a ON p.id = a.paper_id ${whereClause}`;
+  const countSql = `SELECT COUNT(*) FROM papers p ${whereClause}`;
   const countResults = db.exec(countSql, bindValues);
   const total = countResults[0]?.values[0]?.[0] ?? 0;
 
@@ -102,18 +81,6 @@ export function listPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase | nul
     : [];
 
   return { items, total: total as number, page, page_size: pageSize };
-}
-
-/**
- * Get a single paper's full details.
- */
-export function getPaperDetail(db: SqlJsDatabase, paperId: string): PaperWithAnalysis {
-  const sql = `${BASE_SQL} WHERE p.id = ?`;
-  const results = db.exec(sql, [paperId]);
-  if (results.length === 0 || results[0].values.length === 0) {
-    throw new Error(`Paper ${paperId} not found`);
-  }
-  return rowToPaper(execResultToPaperRows(results[0])[0]);
 }
 
 /**
@@ -129,7 +96,7 @@ function formatDateDisplay(dateStr: string): string {
 /**
  * List all distinct publish dates with paper counts.
  */
-export function listFetchDates(db: SqlJsDatabase): FetchDate[] {
+export function listArxivFetchDates(db: SqlJsDatabase): FetchDate[] {
   const results = db.exec(
     `SELECT date(updated_date) as pub_date, COUNT(*) as cnt
      FROM papers
@@ -148,26 +115,4 @@ export function listFetchDates(db: SqlJsDatabase): FetchDate[] {
       display: formatDateDisplay(row[0] as string),
       count: row[1] as number,
     }));
-}
-
-/**
- * Count papers per topic using arxiv_paper_topics junction table.
- */
-export function listTopicCounts(paperTopicsDb: SqlJsDatabase): TopicCount[] {
-  const results = paperTopicsDb.exec(
-    `SELECT t.id, t.name, COALESCE(pt.cnt, 0) as cnt
-     FROM topics t
-     LEFT JOIN (
-       SELECT topic_id, COUNT(DISTINCT paper_id) as cnt
-       FROM arxiv_paper_topics
-       GROUP BY topic_id
-     ) pt ON pt.topic_id = t.id
-     ORDER BY cnt DESC`,
-  );
-  if (results.length === 0) return [];
-  return results[0].values.map(row => ({
-    topic_id: row[0] as number,
-    name: row[1] as string,
-    count: row[2] as number,
-  }));
 }

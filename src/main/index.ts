@@ -4,13 +4,12 @@ import { Database } from './database/connection';
 import { ConferenceAnalysesDb } from './database/conference-analyses';
 import { SettingsDb } from './database/settings';
 import { PaperTopicsDb } from './database/paper-topics';
-import { migrateFromOldAppData, migrateToSplitDatabases } from './database/migrations';
+import { migrateFromOldAppData, migrateToSplitDatabases, migrateAnalysesToFiles } from './database/migrations';
 import { registerIpcHandlers } from './ipc-handlers';
 
 let mainWindow: BrowserWindow | null = null;
 let db: Database | null = null;
 let conferenceDb: Database | null = null;
-let conferenceAnalysesDb: ConferenceAnalysesDb | null = null;
 let settingsDb: SettingsDb | null = null;
 let paperTopicsDb: PaperTopicsDb | null = null;
 
@@ -18,10 +17,6 @@ app.on('before-quit', async () => {
   if (db) {
     await db.close();
     db = null;
-  }
-  if (conferenceAnalysesDb) {
-    await conferenceAnalysesDb.close();
-    conferenceAnalysesDb = null;
   }
   if (settingsDb) {
     await settingsDb.close();
@@ -117,9 +112,6 @@ app.whenReady().then(async () => {
     : join(app.getAppPath(), 'resources', 'conference_papers.db');
   conferenceDb = await Database.fromReadOnlyFile(conferenceDbPath, join(__dirname, 'wasm'));
 
-  conferenceAnalysesDb = new ConferenceAnalysesDb(join(app.getPath('userData'), 'conference_analyses.db'));
-  await conferenceAnalysesDb.init();
-
   settingsDb = new SettingsDb(join(app.getPath('userData'), 'settings.db'));
   await settingsDb.init();
 
@@ -134,7 +126,24 @@ app.whenReady().then(async () => {
     await db.save();
   }
 
-  registerIpcHandlers(db, conferenceDb, conferenceAnalysesDb, settingsDb, paperTopicsDb, createWindow());
+  // Step 4: Migrate analyses from SQL to markdown files
+  // Open conference_analyses.db only if it exists (for migration)
+  const confAnalysesPath = join(app.getPath('userData'), 'conference_analyses.db');
+  const { existsSync } = await import('fs');
+  let conferenceAnalysesDb: ConferenceAnalysesDb | null = null;
+  if (existsSync(confAnalysesPath)) {
+    conferenceAnalysesDb = new ConferenceAnalysesDb(confAnalysesPath);
+    await conferenceAnalysesDb.init();
+  }
+  const analysesMigrated = await migrateAnalysesToFiles(db, conferenceAnalysesDb, conferenceDb, app.getPath('userData'));
+  if (analysesMigrated) {
+    await db.save();
+  }
+  if (conferenceAnalysesDb) {
+    await conferenceAnalysesDb.close();
+  }
+
+  registerIpcHandlers(db, conferenceDb, settingsDb, paperTopicsDb, createWindow());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

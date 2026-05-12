@@ -10,8 +10,8 @@
       <div class="detail-meta">
         <p><strong>作者：</strong>{{ paper.authors.join(', ') }}</p>
         <template v-if="!isConference">
-          <p><strong>分类：</strong>{{ (paper as PaperWithAnalysis).categories.join(', ') }}</p>
-          <p><strong>更新时间：</strong>{{ formatDateFull((paper as PaperWithAnalysis).updated_date) }}</p>
+          <p><strong>分类：</strong>{{ (paper as Paper).categories.join(', ') }}</p>
+          <p><strong>更新时间：</strong>{{ formatDateFull((paper as Paper).updated_date) }}</p>
           <p><strong>arXiv ID：</strong>{{ paper.id }}</p>
         </template>
         <template v-else>
@@ -24,7 +24,7 @@
       <div class="detail-actions">
         <!-- arxiv: open arXiv link -->
         <template v-if="!isConference">
-          <a :href="(paper as PaperWithAnalysis).url" target="_blank" rel="noopener noreferrer" class="action-link action-pdf">arXiv</a>
+          <a :href="(paper as Paper).url" target="_blank" rel="noopener noreferrer" class="action-link action-pdf">arXiv</a>
         </template>
         <!-- conference: open detail page + arxiv link -->
         <template v-else>
@@ -90,12 +90,12 @@
           <div class="tex-content" v-html="renderLatex(abstractText)"></div>
         </div>
         <div v-show="activeTab === 'summary'" class="section-body">
-          <div v-if="!isAnalyzed" class="empty-hint">暂无论文总结，请先执行论文总结</div>
-          <div v-else class="tex-content" v-html="renderMarkdown(paper.summary || '')"></div>
+          <div v-if="!hasSummary" class="empty-hint">暂无论文总结，请先执行论文总结</div>
+          <div v-else class="tex-content" v-html="renderMarkdown(summaryContent || '')"></div>
         </div>
         <div v-show="activeTab === 'analysis'" class="section-body">
-          <div v-if="!paper.analysis" class="empty-hint">暂无论文分析，请先执行论文分析</div>
-          <div v-else class="tex-content" v-html="renderMarkdown(paper.analysis)"></div>
+          <div v-if="!hasAnalysis" class="empty-hint">暂无论文分析，请先执行论文分析</div>
+          <div v-else class="tex-content" v-html="renderMarkdown(analysisContent || '')"></div>
         </div>
         <div v-if="isConference && (paper as ConferencePaper).bibtex" v-show="activeTab === 'bibtex'" class="section-body">
           <pre class="bibtex-code" @click="copyBibtex">{{ (paper as ConferencePaper).bibtex }}</pre>
@@ -112,8 +112,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import type { PaperWithAnalysis } from '../../types/paper'
-import { isAnalyzed as checkAnalyzed } from '../../types/paper'
+import type { Paper } from '../../types/paper'
 import { useSummaryQueueStore } from '../../stores/summaryQueue'
 import { useAnalysisQueueStore } from '../../stores/analysisQueue'
 import { useDownloadQueueStore } from '../../stores/downloadQueue'
@@ -123,12 +122,12 @@ import { useToastStore } from '../../stores/toast'
 import { usePapersStore } from '../../stores/papers'
 import { renderLatex, renderMarkdown, renderMarkdownOnly } from '../../utils/katex'
 import { formatDateFull, extractErrorMessage } from '../../utils/format'
-import { listZoteroCollections, exportPaperToZotero, conferenceExportToZotero, openPdf } from '../../api'
+import { listZoteroCollections, exportPaperToZotero, conferenceExportToZotero, openArxivPdf, getArxivSummary, conferenceGetPaperSummary } from '../../api'
 import type { ZoteroCollection } from '../../api'
 import 'katex/dist/katex.min.css'
 
 const props = defineProps<{
-  paper: PaperWithAnalysis | ConferencePaper | null
+  paper: Paper | ConferencePaper | null
   selectedCount?: number
 }>()
 
@@ -153,13 +152,17 @@ const loadingCollections = ref(false)
 const exportingToZotero = ref(false)
 const showMoreMenu = ref(false)
 
-const hasSummary = computed(() => !!(props.paper?.summary && props.paper.summary.length > 0))
-const hasAnalysis = computed(() => !!(props.paper?.analysis && props.paper.analysis.length > 0))
+// Summary/analysis content loaded from filesystem in real-time
+const summaryContent = ref<string | null>(null)
+const analysisContent = ref<string | null>(null)
+
+const hasSummary = computed(() => summaryContent.value !== null && summaryContent.value.length > 0)
+const hasAnalysis = computed(() => analysisContent.value !== null && analysisContent.value.length > 0)
 
 const abstractText = computed(() => {
   if (!props.paper) return ''
   if (isConference.value) return (props.paper as ConferencePaper).abstract || ''
-  return (props.paper as PaperWithAnalysis).abstract_text || ''
+  return (props.paper as Paper).abstract_text || ''
 })
 
 // Conference papers may not have PDF
@@ -174,13 +177,19 @@ const analysisDisabled = computed(() => {
 })
 
 watch(() => props.paper?.id, async () => {
-  if (!props.paper) { isPdfCached.value = false; return }
+  if (!props.paper) { isPdfCached.value = false; summaryContent.value = null; analysisContent.value = null; return }
   try {
     isPdfCached.value = isConference.value
       ? await window.api.conferenceIsPdfCached(props.paper.id)
-      : await window.api.isPdfCached(props.paper.id)
+      : await window.api.isArxivPdfCached(props.paper.id)
   } catch { isPdfCached.value = false }
+  await loadSummaryAnalysisContent()
 }, { immediate: true })
+
+// Watch contentVersion to reload when queue completes
+watch(() => isConference.value ? conferenceStore.contentVersion : papersStore.contentVersion, async () => {
+  if (props.paper) await loadSummaryAnalysisContent()
+})
 
 // Watch download store to update cached status
 watch(() => downloadStore.isRunning, async (running, wasRunning) => {
@@ -188,7 +197,7 @@ watch(() => downloadStore.isRunning, async (running, wasRunning) => {
     try {
       isPdfCached.value = isConference.value
         ? await window.api.conferenceIsPdfCached(props.paper.id)
-        : await window.api.isPdfCached(props.paper.id)
+        : await window.api.isArxivPdfCached(props.paper.id)
     } catch { isPdfCached.value = false }
   }
 })
@@ -198,14 +207,25 @@ const isInQueue = computed(() => props.paper ? queueStore.isInQueue(props.paper.
 const isAnalysisCurrentPaper = computed(() => props.paper ? analysisQueueStore.currentPaperId === props.paper.id : false)
 const isAnalysisInQueue = computed(() => props.paper ? analysisQueueStore.isInQueue(props.paper.id) : false)
 
-watch(() => props.paper?.summary, (val) => {
+watch(summaryContent, (val) => {
   if (val && activeTab.value === 'abstract') activeTab.value = 'summary'
 })
 
-const isAnalyzed = computed(() => {
-  if (!props.paper) return false
-  return checkAnalyzed(props.paper)
-})
+async function loadSummaryAnalysisContent() {
+  if (!props.paper) return
+  try {
+    if (isConference.value) {
+      summaryContent.value = await conferenceGetPaperSummary(props.paper.id)
+      analysisContent.value = await window.api.conferenceGetPaperAnalysis(props.paper.id)
+    } else {
+      summaryContent.value = await getArxivSummary(props.paper.id)
+      analysisContent.value = await window.api.getArxivAnalysis(props.paper.id)
+    }
+  } catch {
+    summaryContent.value = null
+    analysisContent.value = null
+  }
+}
 
 const addToQueue = () => {
   if (!props.paper) return
@@ -236,7 +256,7 @@ const downloadPdf = () => {
     if (isConference.value) {
       window.api.conferenceOpenPdf(props.paper.id)
     } else {
-      openPdf(props.paper.id)
+      openArxivPdf(props.paper.id)
     }
   } else {
     downloadStore.enqueue([{ id: props.paper.id, title: props.paper.title, conference: isConference.value }])
@@ -250,7 +270,7 @@ const doDeletePdf = async () => {
     if (isConference.value) {
       await window.api.conferenceDeletePdf(props.paper.id)
     } else {
-      await window.api.deletePdf(props.paper.id)
+      await window.api.deleteArxivPdf(props.paper.id)
     }
     isPdfCached.value = false
     toastStore.show('已删除', 'PDF 已删除', 'success')
@@ -265,11 +285,12 @@ const doDeleteSummary = async () => {
   try {
     if (isConference.value) {
       await window.api.conferenceDeleteSummary(props.paper.id)
-      conferenceStore.selectPaper(props.paper.id)
+      await conferenceStore.refreshStatus()
     } else {
-      await window.api.deleteSummary(props.paper.id)
-      papersStore.selectPaper(props.paper.id)
+      await window.api.deleteArxivSummary(props.paper.id)
+      await papersStore.refreshStatus()
     }
+    summaryContent.value = null
     toastStore.show('已删除', '论文总结已删除', 'success')
   } catch (err) {
     toastStore.show('删除失败', '删除失败', 'error', extractErrorMessage(err))
@@ -282,11 +303,10 @@ const doDeleteAnalysis = async () => {
   try {
     if (isConference.value) {
       await window.api.conferenceDeleteAnalysis(props.paper.id)
-      conferenceStore.selectPaper(props.paper.id)
     } else {
-      await window.api.deleteAnalysis(props.paper.id)
-      papersStore.selectPaper(props.paper.id)
+      await window.api.deleteArxivAnalysis(props.paper.id)
     }
+    analysisContent.value = null
     toastStore.show('已删除', '论文分析已删除', 'success')
   } catch (err) {
     toastStore.show('删除失败', '删除失败', 'error', extractErrorMessage(err))
@@ -342,8 +362,8 @@ const doExportToZotero = async (collectionKey: string) => {
   exportingToZotero.value = true
   showZoteroMenu.value = false
   try {
-    const summaryHtml = props.paper.summary ? renderMarkdownOnly(props.paper.summary) : undefined
-    const analysisHtml = props.paper.analysis ? renderMarkdownOnly(props.paper.analysis) : undefined
+    const summaryHtml = summaryContent.value ? renderMarkdownOnly(summaryContent.value) : undefined
+    const analysisHtml = analysisContent.value ? renderMarkdownOnly(analysisContent.value) : undefined
     if (isConference.value) {
       await conferenceExportToZotero(props.paper.id, collectionKey, summaryHtml, analysisHtml)
     } else {
