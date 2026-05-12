@@ -68,6 +68,39 @@ function parseArxivId(entryUri: string): string {
   return match ? match[1] : '';
 }
 
+/** Extract arXiv ID from user input (bare ID, abs/pdf/html URL). Strips version suffix. */
+export function parseArxivIdFromInput(input: string): string | null {
+  const trimmed = input.trim();
+  // Match new-format ID (with or without version) anywhere in the string
+  const match = trimmed.match(/(\d{4}\.\d{4,5})(?:v\d+)?/);
+  if (!match) return null;
+  // Return without version suffix
+  return match[1];
+}
+
+/** Fetch a single paper by arXiv ID using the id_list API parameter. */
+export async function fetchSinglePaper(arxivId: string): Promise<RawPaper | null> {
+  const url = `${ARXIV_API_BASE}?id_list=${encodeURIComponent(arxivId)}&max_results=1`;
+
+  const { body } = await netFetch(url, {
+    headers: { 'User-Agent': 'ArxivDailyGUI/1.0' },
+    signal: AbortSignal.timeout(30000),
+  });
+
+  const xml = body.toString('utf-8');
+  const entries = parseAtomXml(xml);
+  if (entries.length === 0) return null;
+
+  // Strip version suffix from the returned ID to normalize
+  const paper = entries[0];
+  const versionMatch = paper.arxiv_id.match(/^(\d{4}\.\d+)/);
+  if (versionMatch) {
+    paper.arxiv_id = versionMatch[1];
+  }
+
+  return paper;
+}
+
 export async function fetchFromApi(
   category: string,
   startDate: string,

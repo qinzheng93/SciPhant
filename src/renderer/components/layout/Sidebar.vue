@@ -21,6 +21,10 @@
             <Download :size="13" />
             获取指定日期
           </div>
+          <div class="dropdown-menu-item" @click="activeMenu = null; openSinglePaperDialog()">
+            <Download :size="13" />
+            获取单篇论文
+          </div>
         </div>
       </div>
       <div class="menu-wrapper">
@@ -310,6 +314,36 @@
     </div>
   </Teleport>
 
+  <!-- Single paper dialog -->
+  <Teleport to="body">
+    <div v-if="showSinglePaperDialog" class="sidebar-dialog">
+      <div class="dialog-overlay" @click.self="showSinglePaperDialog = false">
+        <div class="dialog-box">
+          <h3 class="dialog-title">获取单篇论文</h3>
+          <div class="dialog-body">
+            <div class="form-group">
+              <label class="form-label">arXiv ID 或链接</label>
+              <input
+                ref="singlePaperInputRef"
+                v-model="singlePaperInput"
+                type="text"
+                class="form-input"
+                placeholder="例如 2301.00001 或 https://arxiv.org/abs/2301.00001"
+                @keydown.enter="fetchSinglePaperAction"
+              />
+            </div>
+          </div>
+          <div class="dialog-footer">
+            <button class="btn-primary" :disabled="!singlePaperInput.trim()" @click="fetchSinglePaperAction">
+              获取
+            </button>
+            <button class="btn-cancel" @click="showSinglePaperDialog = false">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <ImportConferenceDialog
     v-if="showImportDialog"
     @close="showImportDialog = false"
@@ -322,7 +356,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Download, PenLine, Settings, ListChecks, Import } from 'lucide-vue-next'
-import { fetchArxivPapers, fetchArxivPapersThisWeek, fetchArxivPapersByDate, listCategories, listArxivPapers, listConferencePapers, checkArxivSummaryStatus, conferenceCheckPapersSummaryStatus } from '../../api'
+import { fetchArxivPapers, fetchArxivPapersThisWeek, fetchArxivPapersByDate, fetchSingleArxivPaper, listCategories, listArxivPapers, listConferencePapers, checkArxivSummaryStatus, conferenceCheckPapersSummaryStatus } from '../../api'
 import type { Category } from '../../types/config'
 import { usePapersStore } from '../../stores/papers'
 import { useConferencePapersStore } from '../../stores/conference-papers'
@@ -543,6 +577,37 @@ function formatDate(d: Date): string {
 
 const openDateDialog = () => {
   showDateDialog.value = true
+}
+
+// ── Single paper dialog ──────────────────────────────
+
+const showSinglePaperDialog = ref(false)
+const singlePaperInput = ref('')
+const singlePaperInputRef = ref<HTMLInputElement | null>(null)
+
+const openSinglePaperDialog = () => {
+  singlePaperInput.value = ''
+  showSinglePaperDialog.value = true
+}
+
+const fetchSinglePaperAction = async () => {
+  const input = singlePaperInput.value.trim()
+  if (!input) return
+
+  showSinglePaperDialog.value = false
+  try {
+    const result = await fetchSingleArxivPaper(input)
+    if (result.success) {
+      await Promise.all([papersStore.loadFetchDates(), papersStore.loadPapers()])
+      toastStore.show('获取成功', result.paper!.title, 'success')
+    } else if (result.exists) {
+      toastStore.show('提示', '该论文已存在', 'info')
+    } else {
+      toastStore.show('获取失败', result.error || '未知错误', 'error')
+    }
+  } catch (err: unknown) {
+    toastStore.show('获取失败', extractErrorMessage(err), 'error')
+  }
 }
 
 const toggleAllCategories = () => {

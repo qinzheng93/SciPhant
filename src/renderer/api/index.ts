@@ -148,6 +148,17 @@ export const fetchArxivPapersByDate = async (params: ArxivFetchPapersByDateParam
   return window.api.fetchArxivPapersByDate(params)
 }
 
+export interface FetchSinglePaperResult {
+  success: boolean
+  error?: string
+  exists?: boolean
+  paper?: { id: string; title: string }
+}
+
+export const fetchSingleArxivPaper = async (input: string): Promise<FetchSinglePaperResult> => {
+  return window.api.fetchSingleArxivPaper(input)
+}
+
 // Summary API
 export const summarizeArxivPaper = async (paperId: string, skipIfAnalyzed = true): Promise<{ success: boolean; summary: string | null; skipped?: boolean }> => {
   return window.api.summarizeArxivPaper(paperId, skipIfAnalyzed)

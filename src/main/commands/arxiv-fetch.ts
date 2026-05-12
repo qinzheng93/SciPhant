@@ -1,5 +1,5 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { fetchFromApi, savePapers, todayStr, daysAgoStr } from '../services/arxiv-api';
+import { fetchFromApi, fetchSinglePaper, parseArxivIdFromInput, savePapers, todayStr, daysAgoStr } from '../services/arxiv-api';
 import { rebuildArxivPaperTopics } from './rebuild-arxiv-topics';
 
 export interface ArxivFailedCategory {
@@ -149,4 +149,30 @@ export async function fetchArxivPapersByDate(
     failed_categories: failed_categories,
     failed_details: failed_details,
   };
+}
+
+export interface FetchSinglePaperResult {
+  success: boolean;
+  error?: string;
+  exists?: boolean;
+  paper?: { id: string; title: string };
+}
+
+export async function fetchSingleArxivPaper(
+  db: SqlJsDatabase,
+  paperTopicsDb: SqlJsDatabase,
+  input: string,
+): Promise<FetchSinglePaperResult> {
+  const arxivId = parseArxivIdFromInput(input);
+  if (!arxivId) return { success: false, error: '无法解析 arXiv ID' };
+
+  const paper = await fetchSinglePaper(arxivId);
+  if (!paper) return { success: false, error: '未找到该论文' };
+
+  const [inserted] = savePapers(db, [paper]);
+  if (inserted === 0) return { success: false, error: '该论文已存在', exists: true };
+
+  rebuildArxivPaperTopics(db, paperTopicsDb);
+
+  return { success: true, paper: { id: paper.arxiv_id, title: paper.title } };
 }

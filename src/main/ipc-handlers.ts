@@ -201,6 +201,16 @@ export function registerIpcHandlers(
     }
   });
 
+  // Fetch single paper
+  handle('arxiv:fetch-single-paper', async (input: string) => {
+    const result = await arxivFetchCmd.fetchSingleArxivPaper(sqlArxivDb, sqlPaperTopicsDb, input);
+    if (result.success) {
+      await arxivDb.save();
+      await paperTopicsDb.save();
+    }
+    return result;
+  });
+
   // Summary (shallow analysis)
   ipcMain.handle('arxiv:summarize-paper', async (_event, paperId, skipIfAnalyzed) => {
     const controller = new AbortController();
