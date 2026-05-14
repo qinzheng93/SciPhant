@@ -203,8 +203,8 @@ export function registerIpcHandlers(
 
   // Fetch single paper
   handle('arxiv:fetch-single-paper', async (input: string) => {
-    const result = await arxivFetchCmd.fetchSingleArxivPaper(sqlArxivDb, sqlPaperTopicsDb, input);
-    if (result.success) {
+    const result = await arxivFetchCmd.fetchArxivPapersByIds(sqlArxivDb, sqlPaperTopicsDb, input);
+    if (result.fetched.length > 0) {
       await arxivDb.save();
       await paperTopicsDb.save();
     }

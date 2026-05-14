@@ -29,7 +29,7 @@ const api = {
   fetchArxivPapers: (categories?: string[]) => ipcRenderer.invoke('arxiv:fetch-papers', categories),
   fetchArxivPapersThisWeek: (categories?: string[]) => ipcRenderer.invoke('arxiv:fetch-papers-this-week', categories),
   fetchArxivPapersByDate: (params: unknown) => ipcRenderer.invoke('arxiv:fetch-papers-by-date', params),
-  fetchSingleArxivPaper: (input: string) => ipcRenderer.invoke('arxiv:fetch-single-paper', input),
+  fetchArxivPapersByIds: (input: string) => ipcRenderer.invoke('arxiv:fetch-single-paper', input),
 
   // Summary (arXiv)
   summarizeArxivPaper: (id: string, skipIfAnalyzed?: boolean) => ipcRenderer.invoke('arxiv:summarize-paper', id, skipIfAnalyzed),

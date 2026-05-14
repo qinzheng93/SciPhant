@@ -120,8 +120,8 @@ interface ElectronAPI {
     failed_categories: string[]; failed_details: { category: string; error: string }[]
     error?: string
   }>
-  fetchSingleArxivPaper: (input: string) => Promise<{
-    success: boolean; error?: string; exists?: boolean; paper?: { id: string; title: string }
+  fetchArxivPapersByIds: (input: string) => Promise<{
+    success: boolean; fetched: { id: string; title: string }[]; existing: number; failed: number; errors: string[]
   }>
 
   // Summary

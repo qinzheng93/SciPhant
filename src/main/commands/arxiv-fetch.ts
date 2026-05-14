@@ -151,28 +151,52 @@ export async function fetchArxivPapersByDate(
   };
 }
 
-export interface FetchSinglePaperResult {
+export interface FetchPapersResult {
   success: boolean;
-  error?: string;
-  exists?: boolean;
-  paper?: { id: string; title: string };
+  fetched: { id: string; title: string }[];
+  existing: number;
+  failed: number;
+  errors: string[];
 }
 
-export async function fetchSingleArxivPaper(
+export async function fetchArxivPapersByIds(
   db: SqlJsDatabase,
   paperTopicsDb: SqlJsDatabase,
   input: string,
-): Promise<FetchSinglePaperResult> {
-  const arxivId = parseArxivIdFromInput(input);
-  if (!arxivId) return { success: false, error: '无法解析 arXiv ID' };
+): Promise<FetchPapersResult> {
+  const parts = input.split(',').map(s => s.trim()).filter(Boolean);
+  const parsed = parts.map(p => ({ input: p, id: parseArxivIdFromInput(p) }));
+  const failedParse = parsed.filter(p => p.id === null).map(p => p.input);
 
-  const paper = await fetchSinglePaper(arxivId);
-  if (!paper) return { success: false, error: '未找到该论文' };
+  if (failedParse.length > 0) {
+    return { success: false, fetched: [], existing: 0, failed: 0, errors: [`无法解析: ${failedParse.join(', ')}`] };
+  }
 
-  const [inserted] = savePapers(db, [paper]);
-  if (inserted === 0) return { success: false, error: '该论文已存在', exists: true };
+  const uniqueIds = Array.from(new Set(parsed.map(p => p.id as string)));
 
-  rebuildArxivPaperTopics(db, paperTopicsDb);
+  const fetched: { id: string; title: string }[] = [];
+  let existing = 0;
+  let failed = 0;
+  const errors: string[] = [];
 
-  return { success: true, paper: { id: paper.arxiv_id, title: paper.title } };
+  for (const arxivId of uniqueIds) {
+    try {
+      const paper = await fetchSinglePaper(arxivId);
+      if (!paper) { failed++; errors.push(`${arxivId}: 未找到`); continue; }
+
+      const [inserted] = savePapers(db, [paper]);
+      if (inserted === 0) { existing++; continue; }
+
+      fetched.push({ id: paper.arxiv_id, title: paper.title });
+    } catch (e) {
+      failed++;
+      errors.push(`${arxivId}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  if (fetched.length > 0) {
+    rebuildArxivPaperTopics(db, paperTopicsDb);
+  }
+
+  return { success: fetched.length > 0, fetched, existing, failed, errors };
 }

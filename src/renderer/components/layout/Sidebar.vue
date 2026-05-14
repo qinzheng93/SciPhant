@@ -23,7 +23,7 @@
           </div>
           <div class="dropdown-menu-item" @click="activeMenu = null; openSinglePaperDialog()">
             <Download :size="13" />
-            获取单篇论文
+            获取指定论文
           </div>
         </div>
       </div>
@@ -319,22 +319,22 @@
     <div v-if="showSinglePaperDialog" class="sidebar-dialog">
       <div class="dialog-overlay" @click.self="showSinglePaperDialog = false">
         <div class="dialog-box">
-          <h3 class="dialog-title">获取单篇论文</h3>
+          <h3 class="dialog-title">获取指定论文</h3>
           <div class="dialog-body">
             <div class="form-group">
-              <label class="form-label">arXiv ID 或链接</label>
+              <label class="form-label">arXiv ID 或链接（多个用逗号隔开）</label>
               <input
                 ref="singlePaperInputRef"
                 v-model="singlePaperInput"
                 type="text"
                 class="form-input"
-                placeholder="例如 2301.00001 或 https://arxiv.org/abs/2301.00001"
-                @keydown.enter="fetchSinglePaperAction"
+                placeholder="例如 2301.00001, https://arxiv.org/abs/2301.00002"
+                @keydown.enter="fetchPapersByIdsAction"
               />
             </div>
           </div>
           <div class="dialog-footer">
-            <button class="btn-primary" :disabled="!singlePaperInput.trim()" @click="fetchSinglePaperAction">
+            <button class="btn-primary" :disabled="!singlePaperInput.trim()" @click="fetchPapersByIdsAction">
               获取
             </button>
             <button class="btn-cancel" @click="showSinglePaperDialog = false">取消</button>
@@ -356,7 +356,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Download, PenLine, Settings, ListChecks, Import } from 'lucide-vue-next'
-import { fetchArxivPapers, fetchArxivPapersThisWeek, fetchArxivPapersByDate, fetchSingleArxivPaper, listCategories, listArxivPapers, listConferencePapers, checkArxivSummaryStatus, conferenceCheckPapersSummaryStatus } from '../../api'
+import { fetchArxivPapers, fetchArxivPapersThisWeek, fetchArxivPapersByDate, fetchArxivPapersByIds, listCategories, listArxivPapers, listConferencePapers, checkArxivSummaryStatus, conferenceCheckPapersSummaryStatus } from '../../api'
 import type { Category } from '../../types/config'
 import { usePapersStore } from '../../stores/papers'
 import { useConferencePapersStore } from '../../stores/conference-papers'
@@ -490,42 +490,39 @@ const onConferenceImportFailed = (error: string) => {
 
 // ── Fetch logic ──────────────────────────────────────
 
-function showFetchResult(newCount: number, existingCount: number, failedCategories: string[], failedDetails: { category: string; error: string }[], label?: string) {
-  const hasFailures = failedCategories.length > 0
+type FetchMode = 'category' | 'paper'
+
+function showFetchResult(mode: FetchMode, newCount: number, existingCount: number, failedCount: number, failedDetails?: string) {
   const totalCount = newCount + existingCount
+  const hasFailures = failedCount > 0
 
   if (newCount > 0) {
-    const details = `成功抓取 ${totalCount} 篇，本地已有 ${existingCount} 篇`
+    const details = existingCount > 0 ? `成功获取 ${totalCount} 篇，本地已有 ${existingCount} 篇` : undefined
     toastStore.show('获取完成', `新增 ${newCount} 篇论文`, 'success', details)
   } else if (totalCount > 0) {
-    toastStore.show('获取完成', '无新论文', 'info', `已抓取 ${totalCount} 篇，均为本地已有`)
+    toastStore.show('获取完成', '无新论文', 'info', `已获取 ${totalCount} 篇，均为本地已有`)
   } else if (!hasFailures) {
-    toastStore.show('获取完成', label ? `${label}无新论文` : '未找到相关论文', 'info')
+    toastStore.show('获取完成', '未找到相关论文', 'info')
   }
 
   if (hasFailures) {
-    const summary = totalCount > 0
-      ? `${failedCategories.length} 个类别获取失败`
-      : '全部类别获取失败'
-    const details = failedDetails
-      .map(d => `[${d.category}] ${d.error}`)
-      .join('\n')
-    toastStore.show('获取异常', summary, 'error', details)
+    const unit = mode === 'category' ? '个类别' : '篇'
+    const summary = `${failedCount} ${unit}获取失败`
+    toastStore.show('获取异常', summary, 'error', failedDetails)
   }
 }
 
 async function doFetch(mode: 'today' | 'week') {
   if (progressStore.isFetching) return
 
-  const label = mode === 'today' ? '最新' : '本周'
   progressStore.isFetching = true
-  progressStore.progressPhase = `正在获取${label}论文...`
+  progressStore.progressPhase = '正在获取论文...'
   progressStore.progressCurrent = 0
   progressStore.progressTotal = 0
   progressStore.currentPaper = ''
 
   toastStore.resetToastId()
-  fetchingToastId = toastStore.show('抓取中', `正在获取${label}论文...`, 'info', undefined, 0)
+  fetchingToastId = toastStore.show('正在获取论文...', '', 'info', undefined, 0)
 
   try {
     const apiFn = mode === 'today' ? fetchArxivPapers : fetchArxivPapersThisWeek
@@ -536,11 +533,17 @@ async function doFetch(mode: 'today' | 'week') {
         papersStore.loadFetchDates(),
         papersStore.loadPapers(),
       ])
-      showFetchResult(result.new_count, result.existing_count, result.failed_categories, result.failed_details, label)
+      showFetchResult(
+        'category',
+        result.new_count,
+        result.existing_count,
+        result.failed_categories.length,
+        result.failed_details.map(d => `[${d.category}] ${d.error}`).join('\n'),
+      )
     }
   } catch (err: unknown) {
     const msg = extractErrorMessage(err)
-    toastStore.show('获取失败', `获取${label}论文失败`, 'error', msg)
+    toastStore.show('获取失败', '获取论文失败', 'error', msg)
   } finally {
     if (fetchingToastId >= 0) { toastStore.remove(fetchingToastId); fetchingToastId = -1 }
     progressStore.isFetching = false
@@ -590,23 +593,24 @@ const openSinglePaperDialog = () => {
   showSinglePaperDialog.value = true
 }
 
-const fetchSinglePaperAction = async () => {
+const fetchPapersByIdsAction = async () => {
   const input = singlePaperInput.value.trim()
   if (!input) return
 
   showSinglePaperDialog.value = false
+  toastStore.resetToastId()
+  fetchingToastId = toastStore.show('正在获取论文...', '', 'info', undefined, 0)
+
   try {
-    const result = await fetchSingleArxivPaper(input)
-    if (result.success) {
+    const result = await fetchArxivPapersByIds(input)
+    if (result.fetched.length > 0 || result.existing > 0 || result.failed > 0) {
       await Promise.all([papersStore.loadFetchDates(), papersStore.loadPapers()])
-      toastStore.show('获取成功', result.paper!.title, 'success')
-    } else if (result.exists) {
-      toastStore.show('提示', '该论文已存在', 'info')
-    } else {
-      toastStore.show('获取失败', result.error || '未知错误', 'error')
     }
+    showFetchResult('paper', result.fetched.length, result.existing, result.failed, result.errors.join('\n'))
   } catch (err: unknown) {
     toastStore.show('获取失败', extractErrorMessage(err), 'error')
+  } finally {
+    if (fetchingToastId >= 0) { toastStore.remove(fetchingToastId); fetchingToastId = -1 }
   }
 }
 
@@ -647,7 +651,7 @@ const fetchByDateAction = async () => {
   progressStore.currentPaper = ''
 
   toastStore.resetToastId()
-  fetchingToastId = toastStore.show('抓取中', '正在按日期获取论文...', 'info', undefined, 0)
+  fetchingToastId = toastStore.show('正在获取论文...', '', 'info', undefined, 0)
 
   showDateDialog.value = false
 
@@ -663,7 +667,13 @@ const fetchByDateAction = async () => {
       papersStore.loadFetchDates(),
       papersStore.loadPapers(),
     ])
-    showFetchResult(result.new_count, result.local_count, result.failed_categories, result.failed_details)
+    showFetchResult(
+      'category',
+      result.new_count,
+      result.local_count,
+      result.failed_categories.length,
+      result.failed_details.map(d => `[${d.category}] ${d.error}`).join('\n'),
+    )
   } catch (err: unknown) {
     const msg = extractErrorMessage(err)
     toastStore.show('获取失败', '按日期获取失败', 'error', msg)
