@@ -12,7 +12,8 @@
     "build": "vue-tsc --noEmit -p tsconfig.web.json && vite build && tsc -b tsconfig.node.json && node -e \"const fs=require('fs');const p=require('path');fs.cpSync('src/main/database/migrations','dist/main/database/migrations',{recursive:true});fs.mkdirSync('dist/main/wasm',{recursive:true});fs.cpSync('node_modules/sql.js/dist/sql-wasm.wasm','dist/main/wasm/sql-wasm.wasm')\"",
     "package": "npm run build && electron-builder",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "dompurify": "^3.4.3",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^25.8.0",
     "@types/pdf-parse": "^1.1.5",
     "@vitejs/plugin-vue": "^6.0.7",

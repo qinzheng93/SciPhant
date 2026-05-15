@@ -1293,7 +1293,7 @@ const summarizeSelectedPapers = async () => {
 
 .sidebar-queue-panel .queue-section-divider {
   height: 1px;
-  background: var(--border-primary);
+  background: var(--border-secondary);
   margin: 0;
 }
 
