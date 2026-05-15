@@ -34,7 +34,7 @@ app.on('before-quit', async () => {
 
 function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
-    title: 'SciPhant',
+    title: 'Blueberry',
     width: 1200,
     height: 800,
     minWidth: 842,
@@ -73,14 +73,14 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
-app.setName('SciPhant');
+app.setName('Blueberry');
 
 app.whenReady().then(async () => {
 
   const isMac = process.platform === 'darwin';
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac ? [{
-      label: 'SciPhant',
+      label: 'Blueberry',
       submenu: [
         { role: 'about' as const },
         { type: 'separator' as const },

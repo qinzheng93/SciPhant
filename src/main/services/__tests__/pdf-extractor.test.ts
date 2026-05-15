@@ -44,7 +44,7 @@ describe('pdf-extractor', () => {
   let dataDir: string;
 
   beforeEach(async () => {
-    dataDir = await mkdtemp(join(tmpdir(), 'sciphant-pdf-test-'));
+    dataDir = await mkdtemp(join(tmpdir(), 'blueberry-pdf-test-'));
     mockedFetch.mockReset();
   });
 

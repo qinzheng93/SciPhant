@@ -1,4 +1,4 @@
-# SciPhant
+# Blueberry
 
 桌面应用，用于抓取、过滤和分析 arXiv 论文及会议论文。
 

@@ -101,17 +101,17 @@ export class LLMClient {
 
 **4. 创新性评估**
 
-**评分：[X/10]**
+**评分：[较差|一般|较好|优秀]**
 
 **评估依据：**[具体说明优点和不足]
 
 创新性评分标准：
-- 1-3分：增量改进，仅在已有方法上做微调或组合，无实质性新贡献
-- 4-6分：有一定创新，提出新视角或改进方案，但整体框架仍是常规思路
-- 7-8分：显著创新，提出新方法、架构或理论，且有扎实实验支撑
-- 9-10分：突破性工作，开辟新研究方向或解决长期悬而未决的核心难题
+- 较差：增量改进，仅在已有方法上做微调或组合，无实质性新贡献，甚至方法有明显错误
+- 一半：有一定创新，提出新视角或改进方案，但整体框架仍是常规思路
+- 较好：显著创新，提出新方法、架构或理论，且有扎实实验支撑
+- 优秀：突破性工作，开辟新研究方向或解决长期悬而未决的核心难题
 
-注意：大多数论文评分应在4-7分之间，8分及以上需充分理由，不要因发表在顶级会议就给高分。
+注意：针对文章的优缺点进行客观的评价，不要因发表在顶级会议就给高分。
 
 以下是论文的信息：
 
@@ -161,43 +161,43 @@ export class LLMClient {
    * Deep-analyze a full paper (title + extracted PDF text).
    */
   async analyzeFullPaper(title: string, fullText: string, signal?: AbortSignal): Promise<DeepAnalysisResult> {
-    const prompt = `Please perform a deep analysis of the following academic paper. Be specific and grounded in the paper's content — cite specific methods, numbers, and claims rather than giving vague descriptions.
+    const prompt = `请对以下学术论文进行深度分析。要求内容具体、有据可依，引用论文中的具体方法、数据和结论，而非泛泛而谈。
 
-Output template:
+输出模板：
 
-## 1. Core Problem & Motivation
+## 1. 核心问题与动机
 
-[What specific problem does the paper address? What are the limitations of existing approaches that motivate this work?]
+[论文解决的具体问题是什么？现有方法有哪些局限性促使了这项工作？]
 
-## 2. Methodology Details
+## 2. 方法细节
 
-[Describe the technical approach in detail: architecture, key components, loss functions, training strategies. What design choices were made and why?]
+[详细描述技术方案：架构、关键组件、损失函数、训练策略。做了哪些设计选择，为什么？]
 
-## 3. Experimental Conclusions
+## 3. 实验结论
 
-[Benchmarks used, baselines compared, key quantitative results. Are the improvements consistent across datasets/tasks? Are ablation studies included?]
+[使用了哪些基准、对比了哪些基线、关键定量结果。改进在不同数据集/任务上是否一致？是否包含消融实验？]
 
-## 4. Strengths
+## 4. 优势
 
-[Novel contributions, practical value, generalizability. What would be hard to replicate without this paper?]
+[新颖贡献、实用价值、泛化能力。哪些内容如果不读这篇论文很难想到？]
 
-## 5. Weaknesses
+## 5. 不足
 
-[Limitations, unsupported claims, missing baselines, potential biases in evaluation. Under what conditions might the method fail?]
+[局限性、缺乏支撑的结论、缺失的基线对比、评估中的潜在偏差。方法在什么条件下可能失效？]
 
-## 6. Key Conclusions
+## 6. 总结
 
-[Core findings, whether the claims are well-supported by evidence, and what future directions are suggested.]
+[核心发现、结论是否有充分证据支撑、未来方向建议。]
 
-Paper Title: ${title}
+论文标题：${title}
 
-Full Text:
+全文：
 ${fullText}`;
 
     const request = {
       model: this.model,
       messages: [
-        { role: 'system', content: 'You are an expert in academic paper deep analysis. Read the full text carefully and provide a rigorous, objective analysis. Focus on technical soundness, experimental rigor, and practical significance. Respond in English using Markdown format. Use LaTeX for mathematical expressions: inline math with $...$ and display math with $$...$$.' },
+        { role: 'system', content: '你是一位学术论文深度分析专家。请仔细阅读论文全文，提供严谨、客观的分析。重点关注技术合理性、实验严谨性和实际意义。使用 Markdown 格式输出，语言简洁。数学公式使用 LaTeX 格式，行内公式用 $...$，独立公式用 $$...$$。避免不必要的数学公式以简化内容。' },
         { role: 'user', content: prompt },
       ],
       temperature: this.temperature,

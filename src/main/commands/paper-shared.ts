@@ -92,7 +92,7 @@ export async function analyzeFullPaperCore(
   const client = createLLMClient(settingsDb);
   const analysisResult = await client.analyzeFullPaper(title, fullText, signal);
 
-  await writeAnalysisFile(dataDir, 'analyses', category, paperId, analysisResult.analysis);
+  await writeAnalysisFile(dataDir, 'analyses', category, paperId, `# ${title}\n\n${analysisResult.analysis}`);
 
   return { success: true, result: analysisResult };
 }
@@ -128,7 +128,7 @@ export async function summarizePaperCore(
   const client = createLLMClient(settingsDb);
   const result = await client.analyzePaper(title, abstractText, topicNames, signal);
 
-  await writeAnalysisFile(dataDir, 'summaries', category, paperId, result.analysis);
+  await writeAnalysisFile(dataDir, 'summaries', category, paperId, `# ${title}\n\n${result.analysis}`);
   return { success: true, summary: result.analysis, skipped: false };
 }
 

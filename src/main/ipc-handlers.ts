@@ -142,7 +142,7 @@ export function registerIpcHandlers(
     const newDir = result.filePaths[0];
     // Validate writable
     try {
-      const testFile = join(newDir, '.sciphant-write-test');
+      const testFile = join(newDir, '.blueberry-write-test');
       await fs.writeFile(testFile, 'test');
       await fs.unlink(testFile);
     } catch {

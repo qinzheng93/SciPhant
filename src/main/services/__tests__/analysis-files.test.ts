@@ -16,7 +16,7 @@ const ARXIV_CATEGORY = 'arXiv';
 let dataDir: string;
 
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), 'sciphant-analysis-test-'));
+  dataDir = await mkdtemp(join(tmpdir(), 'blueberry-analysis-test-'));
 });
 
 afterEach(async () => {

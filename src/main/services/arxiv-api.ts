@@ -83,7 +83,7 @@ export async function fetchSinglePaper(arxivId: string): Promise<RawPaper | null
   const url = `${ARXIV_API_BASE}?id_list=${encodeURIComponent(arxivId)}&max_results=1`;
 
   const { body } = await netFetch(url, {
-    headers: { 'User-Agent': 'ArxivDailyGUI/1.0' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36' },
     signal: AbortSignal.timeout(30000),
   });
 
@@ -117,7 +117,7 @@ export async function fetchFromApi(
     const url = `${ARXIV_API_BASE}?search_query=${encodeURIComponent(searchQuery)}&start=${start}&max_results=${MAX_PER_PAGE}`;
 
     const { body } = await netFetch(url, {
-      headers: { 'User-Agent': 'ArxivDailyGUI/1.0' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36' },
       signal: AbortSignal.timeout(60000),
     });
 

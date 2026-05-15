@@ -55,7 +55,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: sciphant-${{ matrix.artifact_suffix }}
+          name: blueberry-${{ matrix.artifact_suffix }}
           path: release/
           if-no-files-found: error
 
@@ -71,9 +71,9 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            sciphant-mac-arm64/*
-            sciphant-linux/*
-            sciphant-win/*
+            blueberry-mac-arm64/*
+            blueberry-linux/*
+            blueberry-win/*
           draft: false
           prerelease: false
         env:

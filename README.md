@@ -1,7 +1,7 @@
-# SciPhant
+# Blueberry
 
-[![Version](https://img.shields.io/github/v/release/qinzheng93/SciPhant?color=blue&label=version)](https://github.com/qinzheng93/SciPhant/releases)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/qinzheng93/SciPhant/releases)
+[![Version](https://img.shields.io/github/v/release/qinzheng93/Blueberry?color=blue&label=version)](https://github.com/qinzheng93/Blueberry/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/qinzheng93/Blueberry/releases)
 [![Built with Electron](https://img.shields.io/badge/built%20with-Electron-blue.svg)](https://www.electronjs.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -42,7 +42,7 @@
 
 ### 1. 安装
 
-从 [Releases](https://github.com/qinzheng93/SciPhant/releases) 下载对应平台的安装包。
+从 [Releases](https://github.com/qinzheng93/Blueberry/releases) 下载对应平台的安装包。
 
 - **macOS**: `.dmg`
 - **Linux**: `.AppImage`

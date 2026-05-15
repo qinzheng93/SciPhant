@@ -1,6 +1,6 @@
 # 会议论文数据库格式
 
-SciPhant 支持导入外部 `.db` 文件来添加会议论文数据。本文档说明如何构建符合要求的数据库文件。
+Blueberry 支持导入外部 `.db` 文件来添加会议论文数据。本文档说明如何构建符合要求的数据库文件。
 
 ## Schema
 
@@ -75,7 +75,7 @@ SQL
 
 ## 导入
 
-1. 在 SciPhant 中切换至会议模式
+1. 在 Blueberry 中切换至会议模式
 2. 点击侧边栏「导入会议」
 3. 选择 `.db` 文件
 4. 勾选要导入的会议，处理冲突（如有）
@@ -83,7 +83,7 @@ SQL
 
 ## 验证规则
 
-导入时 SciPhant 会检查：
+导入时 Blueberry 会检查：
 
 - `conferences` 和 `papers` 两张表必须存在
 - 必填列必须存在：`conferences` 需要 `id, short_name, year, full_name`，`papers` 需要 `id, conference_id, title, authors, abstract`

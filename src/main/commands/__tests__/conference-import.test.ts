@@ -287,7 +287,7 @@ describe('conference-import', () => {
   // ── backupConferenceDb / restoreConferenceDb / removeBackup ──
 
   describe('backup and restore', () => {
-    const testDir = join(tmpdir(), `sciphant-test-${Date.now()}`);
+    const testDir = join(tmpdir(), `blueberry-test-${Date.now()}`);
 
     beforeEach(async () => {
       await fs.mkdir(testDir, { recursive: true });

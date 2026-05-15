@@ -12,7 +12,8 @@
           :class="{ active: configStore.theme === option.value }"
           @click="configStore.theme = option.value"
         >
-          {{ option.label }}
+          <component :is="option.icon" :size="28" />
+          <span>{{ option.label }}</span>
         </button>
       </div>
     </div>
@@ -35,16 +36,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { Sun, Moon, Monitor } from 'lucide-vue-next'
 import { getDataDir, setDataDir, resetDataDir } from '../../api'
 import { useConfigStore } from '../../stores/config'
 
 const configStore = useConfigStore()
 const currentDir = ref('')
 
-const themeOptions: { value: 'light' | 'dark' | 'system'; label: string }[] = [
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'system', label: '跟随系统' },
+const themeOptions: { value: 'light' | 'dark' | 'system'; label: string; icon: any }[] = [
+  { value: 'light', label: '浅色', icon: Sun },
+  { value: 'dark', label: '深色', icon: Moon },
+  { value: 'system', label: '跟随系统', icon: Monitor },
 ]
 
 onMounted(async () => {
@@ -74,3 +76,13 @@ const handleReset = async () => {
   }
 }
 </script>
+
+<style scoped>
+.btn-theme {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+}
+</style>
