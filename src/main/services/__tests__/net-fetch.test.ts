@@ -36,7 +36,7 @@ describe('netFetch', () => {
       ok: true,
       status: 200,
       arrayBuffer: async () => body.buffer,
-    });
+    } as unknown as Response);
 
     const result = await netFetch('https://example.com/api');
     expect(result.statusCode).toBe(200);
@@ -49,7 +49,7 @@ describe('netFetch', () => {
       ok: true,
       status: 200,
       arrayBuffer: async () => new ArrayBuffer(0),
-    });
+    } as unknown as Response);
 
     await netFetch('https://example.com/api', {
       headers: { 'X-Custom': 'value' },
@@ -67,7 +67,7 @@ describe('netFetch', () => {
       ok: true,
       status: 200,
       arrayBuffer: async () => new ArrayBuffer(0),
-    });
+    } as unknown as Response);
 
     await netFetch('https://example.com/api', { signal: controller.signal });
 
@@ -81,7 +81,7 @@ describe('netFetch', () => {
     mockNetFetch.mockResolvedValue({
       ok: false,
       status: 429,
-    });
+    } as unknown as Response);
 
     await expect(netFetch('https://example.com/api')).rejects.toThrow('请求频率过高');
   });
@@ -90,7 +90,7 @@ describe('netFetch', () => {
     mockNetFetch.mockResolvedValue({
       ok: false,
       status: 503,
-    });
+    } as unknown as Response);
 
     await expect(netFetch('https://example.com/api')).rejects.toThrow('服务暂时不可用');
   });
@@ -99,7 +99,7 @@ describe('netFetch', () => {
     mockNetFetch.mockResolvedValue({
       ok: false,
       status: 500,
-    });
+    } as unknown as Response);
 
     await expect(netFetch('https://example.com/api')).rejects.toThrow('HTTP 500');
   });
