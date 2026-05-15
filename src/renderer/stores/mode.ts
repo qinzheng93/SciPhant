@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
+import { useConferencePapersStore } from './conference-papers'
 
 export type AppMode = 'arxiv' | 'conference'
 
@@ -20,7 +21,6 @@ export const useModeStore = defineStore('mode', () => {
   async function toggleMode() {
     mode.value = mode.value === 'arxiv' ? 'conference' : 'arxiv'
     if (mode.value === 'conference' && !initialized) {
-      const { useConferencePapersStore } = await import('./conference-papers')
       await useConferencePapersStore().loadConferences()
       await useConferencePapersStore().loadPapers()
       initialized = true
@@ -29,7 +29,6 @@ export const useModeStore = defineStore('mode', () => {
 
   async function initIfNeeded() {
     if (mode.value === 'conference' && !initialized) {
-      const { useConferencePapersStore } = await import('./conference-papers')
       await useConferencePapersStore().loadConferences()
       await useConferencePapersStore().loadPapers()
       initialized = true

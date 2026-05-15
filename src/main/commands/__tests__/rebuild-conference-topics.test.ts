@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import initSqlJs from 'sql.js';
-import { rebuildConferencePaperTopics, updateConferenceTopicAssociations, deleteConferenceTopicAssociations } from '../rebuild-conference-topics';
+import { rebuildConferencePaperTopics, updateConferenceTopicAssociations, deleteConferenceTopicAssociations } from '../rebuild-conference-topics.js';
 
 function setupConferenceDb() {
   const db = new (globalThis as any).__testSQL.Database();

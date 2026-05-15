@@ -1,6 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { getCategoryForConference } from './conference-summary';
-import { createAbortControllerManager, analyzeFullPaperCore, getPaperAnalysisContent, type ProgressCallback } from './paper-shared';
+import { getCategoryForConference } from './conference-summary.js';
+import { createAbortControllerManager, analyzeFullPaperCore, getPaperAnalysisContent, type ProgressCallback } from './paper-shared.js';
 
 const abortMgr = createAbortControllerManager();
 
@@ -19,7 +19,7 @@ export async function analyzeConferenceFullPaper(
   paperId: string,
   signal?: AbortSignal,
   onProgress?: ProgressCallback,
-): Promise<{ success: boolean; result?: import('../services/llm-client').DeepAnalysisResult }> {
+): Promise<{ success: boolean; result?: import('../services/llm-client.js').DeepAnalysisResult }> {
   const category = getCategoryForConference(conferenceDb, paperId);
   if (!category) throw new Error(`Conference category not found for paper ${paperId}`);
 

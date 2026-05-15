@@ -9,7 +9,7 @@ import {
   backupConferenceDb,
   restoreConferenceDb,
   removeBackup,
-} from '../conference-import';
+} from '../conference-import.js';
 
 import * as fs from 'fs/promises';
 import { join } from 'path';

@@ -144,7 +144,7 @@
         <button class="btn-icon" @click="goToConfig">
           <Settings :size="18" />
         </button>
-        <button ref="queueBtnRef" class="btn-queue" @click="toggleQueuePanel">
+        <button class="btn-queue" @click="toggleQueuePanel">
           <span class="queue-icon">
             <ListChecks :size="18" />
             <span v-if="queueTotalCount > 0" class="queue-badge">{{ queueTotalCount }}</span>
@@ -324,7 +324,6 @@
             <div class="form-group">
               <label class="form-label">arXiv ID 或链接（多个用逗号隔开）</label>
               <input
-                ref="singlePaperInputRef"
                 v-model="singlePaperInput"
                 type="text"
                 class="form-input"
@@ -426,7 +425,6 @@ const activeMenu = ref<string | null>(null)
 const toggleMenu = (name: string) => {
   activeMenu.value = activeMenu.value === name ? null : name
 }
-const queueBtnRef = ref<HTMLElement | null>(null)
 const summaryCollapsed = ref(true)
 const analysisCollapsed = ref(true)
 const downloadCollapsed = ref(true)
@@ -586,7 +584,6 @@ const openDateDialog = () => {
 
 const showSinglePaperDialog = ref(false)
 const singlePaperInput = ref('')
-const singlePaperInputRef = ref<HTMLInputElement | null>(null)
 
 const openSinglePaperDialog = () => {
   singlePaperInput.value = ''

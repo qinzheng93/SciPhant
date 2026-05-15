@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, unlink, readdir, rm } from 'fs/promises';
+import { mkdir, writeFile, readFile, unlink, readdir, rm, rename } from 'fs/promises';
 import { join } from 'path';
 
 export type AnalysisType = 'summaries' | 'analyses';
@@ -30,7 +30,6 @@ export async function writeAnalysisFile(
   await mkdir(dir, { recursive: true });
   const tmpPath = filePath + '.tmp';
   await writeFile(tmpPath, content, 'utf-8');
-  const { rename } = await import('fs/promises');
   await rename(tmpPath, filePath);
 }
 

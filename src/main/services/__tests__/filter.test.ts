@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchesKeywords, filterPaperTopics, type Topic } from '../filter';
+import { matchesKeywords, filterPaperTopics, type Topic } from '../filter.js';
 
 describe('matchesKeywords', () => {
   it('returns true when text contains a keyword', () => {

@@ -40,9 +40,9 @@ vi.mock('../rebuild-arxiv-topics', () => ({
   rebuildArxivPaperTopics: vi.fn(),
 }));
 
-import { netFetch } from '../../services/net-fetch';
-import { rebuildArxivPaperTopics } from '../rebuild-arxiv-topics';
-import { fetchArxivPapersByIds } from '../arxiv-fetch';
+import { netFetch } from '../../services/net-fetch.js';
+import { rebuildArxivPaperTopics } from '../rebuild-arxiv-topics.js';
+import { fetchArxivPapersByIds } from '../arxiv-fetch.js';
 
 const mockedNetFetch = vi.mocked(netFetch);
 const mockedRebuild = vi.mocked(rebuildArxivPaperTopics);

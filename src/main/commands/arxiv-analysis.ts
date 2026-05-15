@@ -1,6 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { ARXIV_CATEGORY } from './arxiv-summary';
-import { createAbortControllerManager, analyzeFullPaperCore, getPaperAnalysisContent, type ProgressCallback } from './paper-shared';
+import { ARXIV_CATEGORY } from './arxiv-summary.js';
+import { createAbortControllerManager, analyzeFullPaperCore, getPaperAnalysisContent, type ProgressCallback } from './paper-shared.js';
 
 const abortMgr = createAbortControllerManager();
 
@@ -19,7 +19,7 @@ export async function analyzeArxivFullPaper(
   paperId: string,
   signal?: AbortSignal,
   onProgress?: ProgressCallback,
-): Promise<{ success: boolean; result?: import('../services/llm-client').DeepAnalysisResult }> {
+): Promise<{ success: boolean; result?: import('../services/llm-client.js').DeepAnalysisResult }> {
   const results = db.exec('SELECT title, pdf_url FROM papers WHERE id = ?', [paperId]);
   if (results.length === 0 || results[0].values.length === 0) {
     throw new Error(`Paper ${paperId} not found`);

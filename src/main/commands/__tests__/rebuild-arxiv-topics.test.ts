@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { rebuildArxivPaperTopics, updateArxivTopicAssociations, deleteArxivTopicAssociations } from '../rebuild-arxiv-topics';
+import { rebuildArxivPaperTopics, updateArxivTopicAssociations, deleteArxivTopicAssociations } from '../rebuild-arxiv-topics.js';
 
 function setupArxivDb(): SqlJsDatabase {
   const db = new (globalThis as any).__testSQL.Database();

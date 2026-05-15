@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { listArxivPapers, listArxivFetchDates } from '../arxiv-paper';
+import { listArxivPapers, listArxivFetchDates } from '../arxiv-paper.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS papers (

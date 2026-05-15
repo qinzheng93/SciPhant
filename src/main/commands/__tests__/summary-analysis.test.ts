@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { stopArxivSummary, setArxivSummaryAbortController } from '../arxiv-summary';
-import { stopArxivAnalysis, setArxivAnalysisAbortController, getArxivPaperAnalysis } from '../arxiv-analysis';
+import { stopArxivSummary, setArxivSummaryAbortController } from '../arxiv-summary.js';
+import { stopArxivAnalysis, setArxivAnalysisAbortController, getArxivPaperAnalysis } from '../arxiv-analysis.js';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

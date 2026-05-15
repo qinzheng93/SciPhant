@@ -7,7 +7,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { classifyDirectNetworkError } from '../net-fetch';
+import { classifyDirectNetworkError } from '../net-fetch.js';
 
 describe('classifyDirectNetworkError', () => {
   it('classifies TimeoutError', () => {

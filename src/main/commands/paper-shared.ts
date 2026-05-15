@@ -1,10 +1,10 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import type { Paper } from './arxiv-paper';
-import type { DeepAnalysisResult } from '../services/llm-client';
-import { LLMClient } from '../services/llm-client';
-import { loadLLMConfig } from './config';
-import { extractTextFromUrl } from '../services/pdf-extractor';
-import { writeAnalysisFile, readAnalysisFile } from '../services/analysis-files';
+import type { Paper } from './arxiv-paper.js';
+import type { DeepAnalysisResult } from '../services/llm-client.js';
+import { LLMClient } from '../services/llm-client.js';
+import { loadLLMConfig } from './config.js';
+import { extractTextFromUrl } from '../services/pdf-extractor.js';
+import { writeAnalysisFile, readAnalysisFile } from '../services/analysis-files.js';
 
 export const BASE_SQL = `SELECT
     p.id, p.title, p.authors, p.abstract_text, p.url, p.pdf_url,

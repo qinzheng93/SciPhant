@@ -26,7 +26,7 @@ interface FetchDate {
   count: number;
 }
 
-import { BASE_SQL, rowToPaper, execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared';
+import { BASE_SQL, rowToPaper, execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared.js';
 
 /**
  * List papers with pagination and filtering.

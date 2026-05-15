@@ -2,36 +2,36 @@ import { ipcMain, dialog, app, shell } from 'electron';
 import * as fs from 'fs/promises';
 import { join } from 'path';
 import type { BrowserWindow } from 'electron';
-import type { Database } from './database/connection';
-import type { SettingsDb } from './database/settings';
-import type { PaperTopicsDb } from './database/paper-topics';
-import * as arxivPaperCmd from './commands/arxiv-paper';
-import * as configCmd from './commands/config';
-import * as arxivFetchCmd from './commands/arxiv-fetch';
-import * as arxivSummaryCmd from './commands/arxiv-summary';
-import * as arxivAnalysisCmd from './commands/arxiv-analysis';
-import * as llmCmd from './commands/llm';
-import * as rebuildArxivTopics from './commands/rebuild-arxiv-topics';
-import * as rebuildConferenceTopics from './commands/rebuild-conference-topics';
-import * as conferencePaperCmd from './commands/conference-paper';
-import * as conferenceSummaryCmd from './commands/conference-summary';
-import * as conferenceAnalysisCmd from './commands/conference-analysis';
-import * as conferenceImportCmd from './commands/conference-import';
+import type { Database } from './database/connection.js';
+import type { SettingsDb } from './database/settings.js';
+import type { PaperTopicsDb } from './database/paper-topics.js';
+import * as arxivPaperCmd from './commands/arxiv-paper.js';
+import * as configCmd from './commands/config.js';
+import * as arxivFetchCmd from './commands/arxiv-fetch.js';
+import * as arxivSummaryCmd from './commands/arxiv-summary.js';
+import * as arxivAnalysisCmd from './commands/arxiv-analysis.js';
+import * as llmCmd from './commands/llm.js';
+import * as rebuildArxivTopics from './commands/rebuild-arxiv-topics.js';
+import * as rebuildConferenceTopics from './commands/rebuild-conference-topics.js';
+import * as conferencePaperCmd from './commands/conference-paper.js';
+import * as conferenceSummaryCmd from './commands/conference-summary.js';
+import * as conferenceAnalysisCmd from './commands/conference-analysis.js';
+import * as conferenceImportCmd from './commands/conference-import.js';
 import initSqlJs from 'sql.js';
 import * as fsSync from 'fs';
-import { ensurePdfDownloaded, getPdfPath } from './services/pdf-extractor';
-import { fetchCollections, createItem, createChildItems, type ChildItemPayload } from './services/zotero-client';
-import { loadZoteroConfig, saveDataDir, resetDataDir } from './commands/config';
+import { ensurePdfDownloaded, getPdfPath } from './services/pdf-extractor.js';
+import { fetchCollections, createItem, createChildItems, type ChildItemPayload } from './services/zotero-client.js';
+import { loadZoteroConfig, saveDataDir, resetDataDir } from './commands/config.js';
 import {
   deleteAnalysisFile,
   clearAllAnalysisFiles,
-} from './services/analysis-files';
-import { checkArxivSummaryStatus, getArxivSummaryContent } from './commands/arxiv-summary';
+} from './services/analysis-files.js';
+import { checkArxivSummaryStatus, getArxivSummaryContent } from './commands/arxiv-summary.js';
 import {
   getCategoryForConference,
   checkConferenceSummaryStatus,
   getConferenceSummaryContent,
-} from './commands/conference-summary';
+} from './commands/conference-summary.js';
 
 function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
   ipcMain.handle(channel, async (event, ...args) => {

@@ -1,11 +1,11 @@
 import { app } from 'electron';
 import { join } from 'path';
 import * as fsSync from 'fs';
-import type { Database } from './connection';
-import type { SettingsDb } from './settings';
-import type { PaperTopicsDb } from './paper-topics';
-import { writeAnalysisFile } from '../services/analysis-files';
-import { ARXIV_CATEGORY } from '../commands/arxiv-summary';
+import type { Database } from './connection.js';
+import type { SettingsDb } from './settings.js';
+import type { PaperTopicsDb } from './paper-topics.js';
+import { writeAnalysisFile } from '../services/analysis-files.js';
+import { ARXIV_CATEGORY } from '../commands/arxiv-summary.js';
 
 /**
  * Migrate database files from old app name directory ("arXiv Daily") to current userData.

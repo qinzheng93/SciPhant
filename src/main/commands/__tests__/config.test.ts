@@ -16,7 +16,7 @@ import {
   loadDataDir,
   saveDataDir,
   resetDataDir,
-} from '../config';
+} from '../config.js';
 
 vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/default/userData') },

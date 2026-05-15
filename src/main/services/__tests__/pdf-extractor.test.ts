@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { net } from 'electron';
-import { ensurePdfDownloaded, getPdfPath } from '../pdf-extractor';
+import { ensurePdfDownloaded, getPdfPath } from '../pdf-extractor.js';
 
 vi.mock('electron', () => ({
   net: {

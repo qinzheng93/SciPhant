@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { fetchCollections } from '../zotero-client';
+import { fetchCollections } from '../zotero-client.js';
 
 describe('fetchCollections', () => {
   beforeEach(() => {

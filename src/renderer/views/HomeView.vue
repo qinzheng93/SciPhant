@@ -10,7 +10,7 @@
         <PaperList />
       </MainContent>
       <div class="resize-bar" @mousedown="startResize"></div>
-      <div class="panel-wrapper detail-wrapper" ref="detailRef">
+      <div class="panel-wrapper detail-wrapper">
         <PaperDetail :paper="detailPaper" :selected-count="selectedCount" @close="clearSelection" />
       </div>
     </div>
@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { computed, onUnmounted } from 'vue'
 import AppHeader from '../components/layout/AppHeader.vue'
 import Sidebar from '../components/layout/Sidebar.vue'
 import MainContent from '../components/layout/MainContent.vue'
@@ -31,7 +31,6 @@ import { useModeStore } from '../stores/mode'
 const papersStore = usePapersStore()
 const conferenceStore = useConferencePapersStore()
 const modeStore = useModeStore()
-const detailRef = ref<HTMLElement | null>(null)
 
 const selectedCount = computed(() => {
   return modeStore.isConference

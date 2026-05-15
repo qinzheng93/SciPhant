@@ -2,13 +2,13 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import {
   listConferences, listConferencePapers,
   listConferenceTracks, getConferencePaperPdfUrl,
-} from '../conference-paper';
+} from '../conference-paper.js';
 import {
   stopConferenceSummary,
-} from '../conference-summary';
+} from '../conference-summary.js';
 import {
   stopConferenceAnalysis,
-} from '../conference-analysis';
+} from '../conference-analysis.js';
 import initSqlJs from 'sql.js';
 
 function createDb() {

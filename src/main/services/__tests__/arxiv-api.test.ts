@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
-import { todayStr, daysAgoStr, parseArxivIdFromInput, savePapers } from '../arxiv-api';
+import { todayStr, daysAgoStr, parseArxivIdFromInput, savePapers } from '../arxiv-api.js';
 import initSqlJs from 'sql.js';
 
 // ── Date helpers ──────────────────────────────────────

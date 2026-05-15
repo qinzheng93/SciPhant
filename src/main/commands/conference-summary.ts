@@ -3,8 +3,8 @@ import {
   writeAnalysisFile,
   readAnalysisFile,
   listExistingPaperIds,
-} from '../services/analysis-files';
-import { createAbortControllerManager, summarizePaperCore } from './paper-shared';
+} from '../services/analysis-files.js';
+import { createAbortControllerManager, summarizePaperCore } from './paper-shared.js';
 
 /**
  * Get the conference category string (e.g. "CVPR2025") for a conference paper.

@@ -1,11 +1,12 @@
-import { app, BrowserWindow, shell, Menu } from 'electron';
+import { app, BrowserWindow, shell, Menu, session } from 'electron';
+import { existsSync } from 'fs';
 import { join } from 'path';
-import { Database, CONFERENCE_MIGRATIONS } from './database/connection';
-import { SettingsDb } from './database/settings';
-import { PaperTopicsDb } from './database/paper-topics';
-import { migrateFromOldAppData, migrateToSplitDatabases, migrateAnalysesToFiles } from './database/migrations';
-import { registerIpcHandlers } from './ipc-handlers';
-import { loadDataDir } from './commands/config';
+import { Database, CONFERENCE_MIGRATIONS } from './database/connection.js';
+import { SettingsDb } from './database/settings.js';
+import { PaperTopicsDb } from './database/paper-topics.js';
+import { migrateFromOldAppData, migrateToSplitDatabases, migrateAnalysesToFiles } from './database/migrations.js';
+import { registerIpcHandlers } from './ipc-handlers.js';
+import { loadDataDir } from './commands/config.js';
 
 let mainWindow: BrowserWindow | null = null;
 let arxivDb: Database | null = null;
@@ -33,6 +34,17 @@ app.on('before-quit', async () => {
 });
 
 function createWindow(): BrowserWindow {
+  // Set Content-Security-Policy for all requests
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:*; font-src 'self' data:"
+        ],
+      },
+    });
+  });
   mainWindow = new BrowserWindow({
     title: 'Blueberry',
     width: 1200,
@@ -126,7 +138,6 @@ app.whenReady().then(async () => {
   }
 
   // Step 5: Migrate analyses from SQL to markdown files
-  const { existsSync } = await import('fs');
   const analysesMigrated = await migrateAnalysesToFiles(arxivDb, null, conferenceDb, dataDir);
   if (analysesMigrated) {
     await arxivDb.save();

@@ -2,7 +2,7 @@ import { net } from 'electron';
 import { PDFParse } from 'pdf-parse';
 import { mkdir, readFile, access, open, rename, unlink } from 'fs/promises';
 import { join } from 'path';
-import { classifyDirectNetworkError } from './net-fetch';
+import { classifyDirectNetworkError } from './net-fetch.js';
 
 function getPdfDir(dataDir?: string): string {
   return dataDir ? join(dataDir, 'pdfs') : join(process.cwd(), 'pdfs');

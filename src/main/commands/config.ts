@@ -1,6 +1,7 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import { app } from 'electron';
-import type { Topic } from '../services/filter';
+import type { Topic } from '../services/filter.js';
+import { fetchCollections } from '../services/zotero-client.js';
 
 export interface LLMConfig {
   api_key: string;
@@ -342,7 +343,6 @@ export async function testZoteroConnection(settingsDb: SqlJsDatabase): Promise<{
     return { success: false, message: 'Zotero API Key 和 User ID 未配置' };
   }
   try {
-    const { fetchCollections } = await import('../services/zotero-client');
     const collections = await fetchCollections(config.user_id, config.api_key);
     return { success: true, message: `连接成功，共 ${collections.length} 个分类` };
   } catch (err) {

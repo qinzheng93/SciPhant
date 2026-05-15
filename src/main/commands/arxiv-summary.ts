@@ -3,8 +3,8 @@ import {
   writeAnalysisFile,
   readAnalysisFile,
   listExistingPaperIds,
-} from '../services/analysis-files';
-import { createAbortControllerManager, summarizePaperCore } from './paper-shared';
+} from '../services/analysis-files.js';
+import { createAbortControllerManager, summarizePaperCore } from './paper-shared.js';
 
 export const ARXIV_CATEGORY = 'arXiv';
 

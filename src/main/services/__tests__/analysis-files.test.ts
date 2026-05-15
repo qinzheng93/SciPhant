@@ -9,7 +9,7 @@ import {
   deleteAnalysisFile,
   listExistingPaperIds,
   clearAllAnalysisFiles,
-} from '../analysis-files';
+} from '../analysis-files.js';
 
 const ARXIV_CATEGORY = 'arXiv';
 

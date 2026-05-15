@@ -8,7 +8,7 @@ import {
   createAbortControllerManager,
   loadEnabledTopicNames,
   filterByTopicIds,
-} from '../paper-shared';
+} from '../paper-shared.js';
 
 const TOPICS_SCHEMA = `
 CREATE TABLE IF NOT EXISTS topics (

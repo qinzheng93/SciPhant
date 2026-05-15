@@ -1,5 +1,5 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { netFetch } from './net-fetch';
+import { netFetch } from './net-fetch.js';
 
 // ── Shared types ──────────────────────────────────────────────
 

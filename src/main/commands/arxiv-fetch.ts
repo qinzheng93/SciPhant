@@ -1,6 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { fetchFromApi, fetchSinglePaper, parseArxivIdFromInput, savePapers, todayStr, daysAgoStr } from '../services/arxiv-api';
-import { rebuildArxivPaperTopics } from './rebuild-arxiv-topics';
+import { fetchFromApi, fetchSinglePaper, parseArxivIdFromInput, savePapers, todayStr, daysAgoStr } from '../services/arxiv-api.js';
+import { rebuildArxivPaperTopics } from './rebuild-arxiv-topics.js';
 
 export interface ArxivFailedCategory {
   category: string;

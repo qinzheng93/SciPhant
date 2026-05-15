@@ -1,6 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { filterPaperTopics } from '../services/filter';
-import type { Topic } from '../services/filter';
+import { filterPaperTopics } from '../services/filter.js';
+import type { Topic } from '../services/filter.js';
 
 /**
  * Rebuild arXiv papers' topic associations in paper_topics table.

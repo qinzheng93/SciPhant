@@ -1,6 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { LLMClient } from '../services/llm-client';
-import { loadLLMConfig } from './config';
+import { LLMClient } from '../services/llm-client.js';
+import { loadLLMConfig } from './config.js';
 
 export async function testLLMConnection(settingsDb: SqlJsDatabase): Promise<{
   success: boolean;

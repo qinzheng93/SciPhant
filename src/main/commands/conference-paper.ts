@@ -1,5 +1,5 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared';
+import { execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared.js';
 
 
 

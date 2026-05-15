@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { join } from 'path';
 import initSqlJs from 'sql.js';
-import { deleteAnalysisFile } from '../services/analysis-files';
+import { deleteAnalysisFile } from '../services/analysis-files.js';
 
 // ── Schema Validation ──
 
