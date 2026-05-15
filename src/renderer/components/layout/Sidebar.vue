@@ -3,49 +3,42 @@
     <!-- arxiv mode -->
     <template v-if="!modeStore.isConference">
     <div class="actions-col">
-      <div class="menu-wrapper">
+      <div class="expand-group" :class="{ expanded: activeMenu === 'fetch' }">
         <button class="btn-fetch" :class="{ active: activeMenu === 'fetch' }" :disabled="progressStore.isFetching" @click="toggleMenu('fetch')">
           <Download :size="13" />
           获取论文
         </button>
-        <div v-if="activeMenu === 'fetch'" class="dropdown-menu">
-          <div class="dropdown-menu-item" @click="activeMenu = null; doFetch('today')">
-            <Download :size="13" />
-            获取最新论文
+        <div class="expand-content"><div class="expand-content-inner">
+          <div class="nav-item" @click="activeMenu = null; doFetch('today')">
+            <span class="nav-label">获取最新论文</span>
           </div>
-          <div class="dropdown-menu-item" @click="activeMenu = null; doFetch('week')">
-            <Download :size="13" />
-            获取最近一周
+          <div class="nav-item" @click="activeMenu = null; doFetch('week')">
+            <span class="nav-label">获取最近一周</span>
           </div>
-          <div class="dropdown-menu-item" @click="activeMenu = null; openDateDialog()">
-            <Download :size="13" />
-            获取指定日期
+          <div class="nav-item" @click="activeMenu = null; openDateDialog()">
+            <span class="nav-label">获取指定日期</span>
           </div>
-          <div class="dropdown-menu-item" @click="activeMenu = null; openSinglePaperDialog()">
-            <Download :size="13" />
-            获取指定论文
+          <div class="nav-item" @click="activeMenu = null; openSinglePaperDialog()">
+            <span class="nav-label">获取指定论文</span>
           </div>
-        </div>
+        </div></div>
       </div>
-      <div class="menu-wrapper">
+      <div class="expand-group" :class="{ expanded: activeMenu === 'summarize' }">
         <button class="btn-fetch" :class="{ active: activeMenu === 'summarize' }" :disabled="progressStore.isFetching" @click="toggleMenu('summarize')">
           <PenLine :size="13" />
           总结论文
         </button>
-        <div v-if="activeMenu === 'summarize'" class="dropdown-menu">
-          <div class="dropdown-menu-item" @click="activeMenu = null; analyzePapersAction()">
-            <PenLine :size="13" />
-            总结所有话题
+        <div class="expand-content"><div class="expand-content-inner">
+          <div class="nav-item" @click="activeMenu = null; analyzePapersAction()">
+            <span class="nav-label">总结所有话题</span>
           </div>
-          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeCurrentPapers()">
-            <PenLine :size="13" />
-            总结当前列表
+          <div class="nav-item" @click="activeMenu = null; summarizeCurrentPapers()">
+            <span class="nav-label">总结当前列表</span>
           </div>
-          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeSelectedPapers()">
-            <PenLine :size="13" />
-            总结选中论文
+          <div class="nav-item" @click="activeMenu = null; summarizeSelectedPapers()">
+            <span class="nav-label">总结选中论文</span>
           </div>
-        </div>
+        </div></div>
       </div>
     </div>
 
@@ -79,21 +72,19 @@
         <Import :size="13" />
         导入会议
       </button>
-      <div class="menu-wrapper">
+      <div class="expand-group" :class="{ expanded: activeMenu === 'summarize' }">
         <button class="btn-fetch" :class="{ active: activeMenu === 'summarize' }" :disabled="progressStore.isFetching" @click="toggleMenu('summarize')">
           <PenLine :size="13" />
           总结论文
         </button>
-        <div v-if="activeMenu === 'summarize'" class="dropdown-menu">
-          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeCurrentPapers()">
-            <PenLine :size="13" />
-            总结当前列表
+        <div class="expand-content"><div class="expand-content-inner">
+          <div class="nav-item" @click="activeMenu = null; summarizeCurrentPapers()">
+            <span class="nav-label">总结当前列表</span>
           </div>
-          <div class="dropdown-menu-item" @click="activeMenu = null; summarizeSelectedPapers()">
-            <PenLine :size="13" />
-            总结选中论文
+          <div class="nav-item" @click="activeMenu = null; summarizeSelectedPapers()">
+            <span class="nav-label">总结选中论文</span>
           </div>
-        </div>
+        </div></div>
       </div>
     </div>
 
@@ -366,10 +357,12 @@ import { useAnalysisQueueStore } from '../../stores/analysisQueue'
 import { useDownloadQueueStore } from '../../stores/downloadQueue'
 import { useToastStore } from '../../stores/toast'
 import { extractErrorMessage } from '../../utils/format'
+import { useConfigStore } from '../../stores/config'
 import ImportConferenceDialog from '../conference/ImportConferenceDialog.vue'
 
 const router = useRouter()
 const papersStore = usePapersStore()
+const configStore = useConfigStore()
 const conferenceStore = useConferencePapersStore()
 const modeStore = useModeStore()
 const progressStore = useProgressStore()
@@ -453,7 +446,7 @@ const stopCurrentPaperAnalysis = () => analysisQueueStore.cancelCurrent()
 
 function onDocumentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
-  if (activeMenu.value && !target.closest('.menu-wrapper')) activeMenu.value = null
+  if (activeMenu.value && !target.closest('.expand-group')) activeMenu.value = null
   if (!showQueuePanel.value) return
   if (target.closest('.queue-panel') || target.closest('.btn-queue')) return
   showQueuePanel.value = false
@@ -687,6 +680,7 @@ const analyzePapersAction = async () => {
   const isConf = modeStore.isConference
   const listFn = isConf ? listConferencePapers : listArxivPapers
   const checkFn = isConf ? conferenceCheckPapersSummaryStatus : checkArxivSummaryStatus
+  const allTopicIds = configStore.topics.map(t => t.id)
   const params = isConf
     ? {
         conferenceId: conferenceStore.selectedConferenceId || undefined,
@@ -694,7 +688,7 @@ const analyzePapersAction = async () => {
         topicIds: conferenceStore.selectedTopicIds.length > 0 ? [...conferenceStore.selectedTopicIds] : undefined,
       }
     : {
-        topicIds: papersStore.selectedTopicIds.length > 0 ? [...papersStore.selectedTopicIds] : undefined,
+        topicIds: allTopicIds.length > 0 ? allTopicIds : undefined,
       }
 
   try {
@@ -826,6 +820,7 @@ const summarizeSelectedPapers = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .btn-fetch:hover:not(:disabled) {
@@ -841,39 +836,34 @@ const summarizeSelectedPapers = async () => {
   cursor: not-allowed;
 }
 
-.menu-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  width: 100%;
-  background: var(--card-bg);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px var(--shadow-md);
-  z-index: 50;
-  padding: 6px;
-}
-
-.dropdown-menu-item {
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
+.expand-group {
+  display: grid;
+  grid-template-rows: 30px 0fr;
+  transition: grid-template-rows 0.2s ease;
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  background-color: transparent;
 }
 
-.dropdown-menu-item:hover {
-  background: var(--border-primary);
+.expand-group.expanded {
+  grid-template-rows: 30px 1fr;
+  background-color: var(--sidebar-bg-alt, var(--bg-tertiary));
+}
+
+.expand-content {
+  overflow: hidden;
+}
+
+.expand-content-inner {
+  padding: 4px;
+}
+
+.expand-content-inner .nav-item {
+  margin-bottom: 0;
+  padding: 6px 10px;
+}
+
+.expand-content-inner .nav-label {
+  font-size: 13px;
 }
 
 .dates-section {
@@ -924,6 +914,10 @@ const summarizeSelectedPapers = async () => {
 .group-header {
   cursor: pointer;
   margin-bottom: 0;
+}
+
+.conference-group.expanded .group-header {
+  background: var(--border-primary);
 }
 
 .group-years {

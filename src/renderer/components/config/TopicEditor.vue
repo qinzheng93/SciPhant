@@ -1,14 +1,14 @@
 <template>
   <div class="config-section">
-    <h3>主题管理</h3>
-    <p class="setting-hint">通过关键词匹配自动为论文关联主题。</p>
+    <h3>话题管理</h3>
+    <p class="setting-hint">通过关键词匹配自动为论文关联话题。</p>
 
     <div class="topics-list">
       <div v-for="topic in configStore.topics" :key="topic.id" class="topic-item">
         <div v-if="editingId === topic.id" class="topic-edit">
           <div class="form-field">
-            <label class="field-label">主题名称</label>
-            <input v-model="editForm.name" placeholder="输入主题名称" class="edit-input" />
+            <label class="field-label">话题名称</label>
+            <input v-model="editForm.name" placeholder="输入话题名称" class="edit-input" />
           </div>
           <div class="form-field">
             <label class="field-label">关键词（逗号分隔）</label>
@@ -33,17 +33,17 @@
     </div>
 
     <div class="bottom-actions">
-      <button @click="startAdd" class="btn-default">添加主题</button>
+      <button @click="startAdd" class="btn-default">添加话题</button>
       <button @click="rebuildIndex" class="btn-default">重建索引</button>
     </div>
 
     <!-- Add topic dialog -->
     <div v-if="isAdding" class="dialog-overlay" @click.self="cancelAdd">
       <div class="dialog">
-        <h4 class="dialog-title">添加主题</h4>
+        <h4 class="dialog-title">添加话题</h4>
         <div class="form-field">
-          <label class="field-label">主题名称</label>
-          <input v-model="newTopic.name" placeholder="输入主题名称" class="edit-input" />
+          <label class="field-label">话题名称</label>
+          <input v-model="newTopic.name" placeholder="输入话题名称" class="edit-input" />
         </div>
         <div class="form-field">
           <label class="field-label">关键词（逗号分隔）</label>

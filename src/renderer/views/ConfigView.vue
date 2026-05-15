@@ -124,9 +124,9 @@ const handleClearAnalyses = async () => {
   border-bottom: 1px solid var(--border-primary);
   display: flex;
   align-items: center;
-  padding: 0 24px 0 80px;
+  padding: 0 24px 0 92px;
   -webkit-app-region: drag;
-  gap: 12px;
+  gap: 6px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -139,7 +139,7 @@ const handleClearAnalyses = async () => {
 .back-btn {
   width: 32px;
   height: 32px;
-  color: var(--text-tertiary);
+  color: var(--text-primary);
   -webkit-app-region: no-drag;
   border: none;
   background: transparent;
@@ -157,7 +157,7 @@ const handleClearAnalyses = async () => {
 .config-header h1 {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-tertiary);
+  color: var(--text-primary);
 }
 
 .config-content {
