@@ -10,12 +10,13 @@ export interface QueueItem {
 
 export interface ProcessingQueueOptions {
   name: string
+  errorTitle?: string
   processItem: (item: QueueItem) => Promise<{ cancelled?: boolean } | void>
   stopApi: () => Promise<{ success: boolean }>
   onCompleteAll?: () => Promise<void>
 }
 
-export function createProcessingQueue({ name, processItem, stopApi, onCompleteAll }: ProcessingQueueOptions) {
+export function createProcessingQueue({ name, errorTitle, processItem, stopApi, onCompleteAll }: ProcessingQueueOptions) {
   const queue = ref<QueueItem[]>([])
   const currentItem = ref<QueueItem | null>(null)
   const currentPaperId = ref<string | null>(null)
@@ -111,7 +112,7 @@ export function createProcessingQueue({ name, processItem, stopApi, onCompleteAl
             continue
           }
           errorCount.value++
-          useToastStore().show('失败', truncate(item.title), 'error', extractErrorMessage(err))
+          useToastStore().show(errorTitle ?? '失败', truncate(item.title), 'error', extractErrorMessage(err))
           console.error(`[${name}] Error for paper ${item.id}: ${msg}`)
         }
       }

@@ -12,6 +12,7 @@ export const useSummaryQueueStore = defineStore('summaryQueue', () => {
 
   const queue = createProcessingQueue({
     name: 'SummaryQueue',
+    errorTitle: '总结失败',
     processItem: async (item) => {
       progressStore.currentPaper = item.title
       updateProgress()

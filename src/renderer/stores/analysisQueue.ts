@@ -13,6 +13,7 @@ export const useAnalysisQueueStore = defineStore('analysisQueue', () => {
 
   const queue = createProcessingQueue({
     name: 'AnalysisQueue',
+    errorTitle: '分析失败',
     processItem: async (item) => {
       const downloadStore = useDownloadQueueStore()
       await downloadStore.waitForDownload(item.id)

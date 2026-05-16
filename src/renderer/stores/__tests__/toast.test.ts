@@ -34,31 +34,33 @@ describe('useToastStore', () => {
       expect(store.toasts[0].type).toBe('info');
     });
 
-    it('defaults duration to 3000 for info type', () => {
+    it('defaults duration to 8000 for info type', () => {
       const store = useToastStore();
       store.show('T', 'B');
-      vi.advanceTimersByTime(2999);
+      vi.advanceTimersByTime(7999);
       expect(store.toasts).toHaveLength(1);
       vi.advanceTimersByTime(2);
       // After duration, remove() is called (sets removing=true), then after 250ms filter
       expect(store.toasts[0].removing).toBe(true);
     });
 
-    it('defaults duration to 3000 for success type', () => {
+    it('defaults duration to 8000 for success type', () => {
       const store = useToastStore();
       store.show('T', 'B', 'success');
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(8000);
       expect(store.toasts[0].removing).toBe(true);
     });
 
-    it('defaults duration to 0 for error type (no auto-remove)', () => {
+    it('defaults duration to 15000 for error type', () => {
       const store = useToastStore();
       store.show('T', 'B', 'error');
-      vi.advanceTimersByTime(100000);
+      vi.advanceTimersByTime(14999);
       expect(store.toasts[0].removing).toBe(false);
+      vi.advanceTimersByTime(2);
+      expect(store.toasts[0].removing).toBe(true);
     });
 
-    it('uses 8000 default duration when details present', () => {
+    it('info with details still uses 8000 default duration', () => {
       const store = useToastStore();
       store.show('T', 'B', 'info', 'details');
       vi.advanceTimersByTime(7999);
@@ -154,7 +156,7 @@ describe('useToastStore', () => {
     it('toast is fully removed after duration + 250ms', () => {
       const store = useToastStore();
       store.show('T', 'B', 'info');
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(8000);
       expect(store.toasts[0].removing).toBe(true);
       expect(store.toasts).toHaveLength(1);
       vi.advanceTimersByTime(250);
