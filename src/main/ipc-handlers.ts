@@ -19,6 +19,7 @@ import * as conferenceAnalysisCmd from './commands/conference-analysis.js';
 import * as conferenceImportCmd from './commands/conference-import.js';
 import * as fsSync from 'fs';
 import { getSqlJs } from './database/connection.js';
+import type * as IPC from '../shared/ipc-api.js';
 import { ensurePdfDownloaded, getPdfPath } from './services/pdf-extractor.js';
 import { fetchCollections, createItem, createChildItems, type ChildItemPayload } from './services/zotero-client.js';
 import { loadZoteroConfig, saveDataDir, resetDataDir } from './commands/config.js';
@@ -117,7 +118,7 @@ export function registerIpcHandlers(
     return { success: true };
   });
   handle('get-config', async () => configCmd.getConfig(sqlSettingsDb));
-  handle('update-config', async (config: { llm: configCmd.LLMConfig; output: configCmd.OutputConfig; zotero?: configCmd.ZoteroConfig; theme?: string }) => {
+  handle('update-config', async (config: { llm: IPC.LLMConfig; output: IPC.OutputConfig; zotero?: IPC.ZoteroConfig; theme?: string }) => {
     configCmd.updateConfig(sqlSettingsDb, config.llm, config.output, config.zotero, config.theme);
     await settingsDb.save();
   });
@@ -338,7 +339,7 @@ export function registerIpcHandlers(
     }
     // Fetch paper from DB
     const results = sqlArxivDb.exec(
-      'SELECT id, title, authors, abstract_text, url, pdf_url, published_date, categories FROM papers WHERE id = ?',
+      'SELECT id, title, authors, abstract, url, pdf_url, published_date, categories FROM papers WHERE id = ?',
       [paperId],
     );
     if (results.length === 0 || results[0].values.length === 0) {
@@ -666,7 +667,7 @@ export function registerIpcHandlers(
     }
   });
 
-  handle('conference:import', async (options: { filePath: string; resolutions: conferenceImportCmd.ConflictResolution[]; selectedConferenceIds?: number[] }) => {
+  handle('conference:import', async (options: { filePath: string; resolutions: IPC.ConflictResolution[]; selectedConferenceIds?: number[] }) => {
     const dbPath = join(dataDir, 'conference_papers.db');
     let backupPath: string | null = null;
 

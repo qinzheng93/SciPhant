@@ -21,10 +21,9 @@ import { computed } from 'vue'
 import { usePapersStore } from '../../stores/papers'
 import { useConferencePapersStore } from '../../stores/conference-papers'
 import { useModeStore } from '../../stores/mode'
-import type { Paper } from '../../types/paper'
 import { formatDate } from '../../utils/format'
 
-type PaperLike = Paper | ConferencePaper
+type PaperLike = ArxivPaper | ConferencePaper
 
 function isConferencePaper(paper: PaperLike): paper is ConferencePaper {
   return 'conference_id' in paper

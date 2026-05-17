@@ -56,7 +56,7 @@ export async function summarizeArxivPaper(
   summary?: string | null;
   skipped: boolean;
 }> {
-  const results = db.exec('SELECT id, title, abstract_text FROM papers WHERE id = ?', [paperId]);
+  const results = db.exec('SELECT id, title, abstract FROM papers WHERE id = ?', [paperId]);
   if (results.length === 0 || results[0].values.length === 0) {
     throw new Error(`Paper ${paperId} not found`);
   }

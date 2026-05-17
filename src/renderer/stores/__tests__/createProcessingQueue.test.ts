@@ -93,9 +93,7 @@ describe('createProcessingQueue', () => {
         stopApi: vi.fn().mockResolvedValue({ success: true }),
       });
       testQueue.enqueue([{ id: '1', title: 'A' }, { id: '2', title: 'B' }, { id: '3', title: 'C' }]);
-      // enqueue starts processQueue automatically, wait for all to complete
-      await new Promise(r => setTimeout(r, 50));
-      expect(order).toEqual(['1', '2', '3']);
+      await vi.waitFor(() => expect(order).toEqual(['1', '2', '3']));
       expect(testQueue.completedCount.value).toBe(3);
     });
 
@@ -109,9 +107,8 @@ describe('createProcessingQueue', () => {
         stopApi: vi.fn().mockResolvedValue({ success: true }),
       });
       testQueue.enqueue([{ id: '1', title: 'A' }]);
-      await new Promise(r => setTimeout(r, 50));
+      await vi.waitFor(() => expect(testQueue.currentPaperId.value).toBeNull());
       expect(idsDuringProcessing).toContain('1');
-      expect(testQueue.currentPaperId.value).toBeNull();
     });
 
     it('increments errorCount on failure', async () => {
@@ -121,8 +118,7 @@ describe('createProcessingQueue', () => {
         stopApi: vi.fn().mockResolvedValue({ success: true }),
       });
       testQueue.enqueue([{ id: '1', title: 'A' }]);
-      await new Promise(r => setTimeout(r, 50));
-      expect(testQueue.errorCount.value).toBe(1);
+      await vi.waitFor(() => expect(testQueue.errorCount.value).toBe(1));
     });
 
     it('does not duplicate processing when called while running', async () => {
@@ -149,8 +145,7 @@ describe('createProcessingQueue', () => {
         stopApi: vi.fn().mockResolvedValue({ success: true }),
       });
       testQueue.enqueue([{ id: '1', title: 'A' }, { id: '2', title: 'B' }]);
-      await new Promise(r => setTimeout(r, 50));
-      expect(testQueue.completedCount.value).toBe(1);
+      await vi.waitFor(() => expect(testQueue.completedCount.value).toBe(1));
     });
   });
 });

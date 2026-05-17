@@ -55,11 +55,11 @@ describe('execResultToPaperRows', () => {
 
   it('handles columns with special characters in values', () => {
     const result = {
-      columns: ['id', 'abstract_text'],
+      columns: ['id', 'abstract'],
       values: [['1', 'This has "quotes" and new\nlines']],
     };
     const rows = execResultToPaperRows(result);
-    expect(rows[0].abstract_text).toBe('This has "quotes" and new\nlines');
+    expect(rows[0].abstract).toBe('This has "quotes" and new\nlines');
   });
 });
 
@@ -69,7 +69,7 @@ describe('rowToPaper', () => {
       id: '1234.5678',
       title: 'Test Paper',
       authors: '["Alice", "Bob"]',
-      abstract_text: 'Abstract',
+      abstract: 'Abstract',
       url: 'https://arxiv.org/abs/1234.5678',
       pdf_url: 'https://arxiv.org/pdf/1234.5678.pdf',
       published_date: '2024-03-15',
@@ -87,7 +87,7 @@ describe('rowToPaper', () => {
       id: '1',
       title: 'T',
       authors: '[]',
-      abstract_text: '',
+      abstract: '',
       url: '',
       pdf_url: '',
       published_date: '',

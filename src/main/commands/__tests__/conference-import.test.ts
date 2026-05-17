@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
 import {
@@ -11,9 +11,25 @@ import {
   removeBackup,
 } from '../conference-import.js';
 
+// Mock analysis-files and connection for import tests
+vi.mock('../../services/analysis-files.js', () => ({
+  deleteAnalysisFile: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../database/connection.js', async () => {
+  const initSqlJsFn = (await import('sql.js')).default;
+  return {
+    getSqlJs: () => initSqlJsFn({ locateFile: () => 'node_modules/sql.js/dist/sql-wasm.wasm' }),
+  };
+});
+
 import * as fs from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { deleteAnalysisFile } from '../../services/analysis-files.js';
+import { importFromExternalDb, clearAnalysisForConference } from '../conference-import.js';
+
+const mockedDeleteAnalysisFile = vi.mocked(deleteAnalysisFile);
 
 const CONFERENCE_SCHEMA = `
 CREATE TABLE conferences (
@@ -327,6 +343,202 @@ describe('conference-import', () => {
     // Clean up
     afterAll(async () => {
       await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
+    });
+  });
+
+  // ── clearAnalysisForConference ──
+
+  describe('clearAnalysisForConference', () => {
+    let targetDb: SqlJsDatabase;
+    const dataDir = '/tmp/test-data';
+
+    beforeEach(() => {
+      targetDb = createDb();
+      targetDb.run(CONFERENCE_SCHEMA);
+      vi.clearAllMocks();
+    });
+
+    it('does nothing when conference not found', async () => {
+      await clearAnalysisForConference(dataDir, targetDb, 999);
+      expect(mockedDeleteAnalysisFile).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when conference has no papers', async () => {
+      seedConference(targetDb, 1, 'CVPR', 2025);
+      await clearAnalysisForConference(dataDir, targetDb, 1);
+      expect(mockedDeleteAnalysisFile).not.toHaveBeenCalled();
+    });
+
+    it('deletes summaries and analyses for all papers', async () => {
+      seedConference(targetDb, 1, 'CVPR', 2025);
+      seedPaper(targetDb, 'p1', 1, 'Paper A');
+      seedPaper(targetDb, 'p2', 1, 'Paper B');
+
+      await clearAnalysisForConference(dataDir, targetDb, 1);
+
+      // 2 papers × 2 calls (summary + analysis) = 4
+      expect(mockedDeleteAnalysisFile).toHaveBeenCalledTimes(4);
+      expect(mockedDeleteAnalysisFile).toHaveBeenCalledWith(dataDir, 'summaries', 'CVPR2025', 'p1');
+      expect(mockedDeleteAnalysisFile).toHaveBeenCalledWith(dataDir, 'analyses', 'CVPR2025', 'p1');
+      expect(mockedDeleteAnalysisFile).toHaveBeenCalledWith(dataDir, 'summaries', 'CVPR2025', 'p2');
+      expect(mockedDeleteAnalysisFile).toHaveBeenCalledWith(dataDir, 'analyses', 'CVPR2025', 'p2');
+    });
+  });
+
+  // ── importFromExternalDb ──
+
+  describe('importFromExternalDb', () => {
+    const importDir = join(tmpdir(), `blueberry-import-${Date.now()}`);
+
+    beforeAll(async () => {
+      await fs.mkdir(importDir, { recursive: true });
+    });
+
+    afterAll(async () => {
+      await fs.rm(importDir, { recursive: true, force: true }).catch(() => {});
+    });
+
+    async function writeSourceDb(conferences: { id: number; short_name: string; year: number; full_name?: string }[], papers: { id: string; conf_id: number; title: string }[]): Promise<string> {
+      const db = createDb();
+      db.run(CONFERENCE_SCHEMA);
+      for (const c of conferences) {
+        db.run('INSERT INTO conferences (id, short_name, year, full_name) VALUES (?, ?, ?, ?)', [c.id, c.short_name, c.year, c.full_name ?? null]);
+      }
+      for (const p of papers) {
+        db.run('INSERT INTO papers (id, conference_id, title, authors, abstract) VALUES (?, ?, ?, ?, ?)', [p.id, p.conf_id, p.title, '[]', '']);
+      }
+      const data = db.export();
+      db.close();
+      const sourcePath = join(importDir, `source-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
+      await fs.writeFile(sourcePath, Buffer.from(data));
+      return sourcePath;
+    }
+
+    it('imports new conferences and papers', async () => {
+      const sourcePath = await writeSourceDb(
+        [{ id: 1, short_name: 'CVPR', year: 2025 }],
+        [{ id: 'p1', conf_id: 1, title: 'Paper A' }],
+      );
+      const targetDb = createDb();
+      targetDb.run(CONFERENCE_SCHEMA);
+
+      const result = await importFromExternalDb(sourcePath, targetDb, []);
+
+      expect(result.success).toBe(true);
+      expect(result.importedConferences).toBe(1);
+      expect(result.importedPapers).toBe(1);
+      expect(result.skippedConferences).toBe(0);
+
+      // Verify data in target
+      const confs = targetDb.exec('SELECT short_name, year FROM conferences');
+      expect(confs[0].values[0]).toEqual(['CVPR', 2025]);
+
+      const papers = targetDb.exec('SELECT title FROM papers');
+      expect(papers[0].values[0]).toEqual(['Paper A']);
+
+      targetDb.close();
+    });
+
+    it('filters by selectedConferenceIds', async () => {
+      const sourcePath = await writeSourceDb(
+        [{ id: 1, short_name: 'CVPR', year: 2025 }, { id: 2, short_name: 'ICLR', year: 2025 }],
+        [{ id: 'p1', conf_id: 1, title: 'P1' }, { id: 'p2', conf_id: 2, title: 'P2' }],
+      );
+      const targetDb = createDb();
+      targetDb.run(CONFERENCE_SCHEMA);
+
+      const result = await importFromExternalDb(sourcePath, targetDb, [], undefined, [2]);
+
+      expect(result.importedConferences).toBe(1);
+      expect(result.importedPapers).toBe(1);
+
+      const confs = targetDb.exec('SELECT short_name FROM conferences');
+      expect(confs[0].values[0][0]).toBe('ICLR');
+
+      targetDb.close();
+    });
+
+    it('skips conflicting conference with skip action', async () => {
+      const sourcePath = await writeSourceDb(
+        [{ id: 1, short_name: 'CVPR', year: 2025 }],
+        [{ id: 'sp1', conf_id: 1, title: 'Source' }],
+      );
+      const targetDb = createDb();
+      targetDb.run(CONFERENCE_SCHEMA);
+      seedConference(targetDb, 10, 'CVPR', 2025);
+      seedPaper(targetDb, 'tp1', 10, 'Target');
+
+      const result = await importFromExternalDb(sourcePath, targetDb, [
+        { short_name: 'CVPR', year: 2025, action: 'skip' },
+      ]);
+
+      expect(result.skippedConferences).toBe(1);
+      expect(result.importedConferences).toBe(0);
+
+      // Target data unchanged
+      const papers = targetDb.exec('SELECT title FROM papers');
+      expect(papers[0].values[0][0]).toBe('Target');
+
+      targetDb.close();
+    });
+
+    it('overwrites conflicting conference', async () => {
+      const sourcePath = await writeSourceDb(
+        [{ id: 1, short_name: 'CVPR', year: 2025 }],
+        [{ id: 'sp1', conf_id: 1, title: 'New Paper' }],
+      );
+      const targetDb = createDb();
+      targetDb.run(CONFERENCE_SCHEMA);
+      seedConference(targetDb, 10, 'CVPR', 2025);
+      seedPaper(targetDb, 'tp1', 10, 'Old Paper');
+
+      const result = await importFromExternalDb(sourcePath, targetDb, [
+        { short_name: 'CVPR', year: 2025, action: 'overwrite_keep_analysis' },
+      ]);
+
+      expect(result.importedConferences).toBe(1);
+      expect(result.importedPapers).toBe(1);
+
+      const papers = targetDb.exec('SELECT title FROM papers');
+      expect(papers[0].values[0][0]).toBe('New Paper');
+
+      targetDb.close();
+    });
+
+    it('calls clearAnalysisForConference with overwrite_clear_analysis', async () => {
+      const sourcePath = await writeSourceDb(
+        [{ id: 1, short_name: 'CVPR', year: 2025 }],
+        [{ id: 'sp1', conf_id: 1, title: 'New' }],
+      );
+      const targetDb = createDb();
+      targetDb.run(CONFERENCE_SCHEMA);
+      seedConference(targetDb, 10, 'CVPR', 2025);
+      seedPaper(targetDb, 'tp1', 10, 'Old');
+
+      const dataDir = '/test-data-dir';
+      await importFromExternalDb(sourcePath, targetDb, [
+        { short_name: 'CVPR', year: 2025, action: 'overwrite_clear_analysis' },
+      ], dataDir);
+
+      // clearAnalysisForConference should have been called for the target conference
+      expect(mockedDeleteAnalysisFile).toHaveBeenCalled();
+
+      targetDb.close();
+    });
+
+    it('imports multiple conferences', async () => {
+      const sourcePath = await writeSourceDb(
+        [{ id: 1, short_name: 'CVPR', year: 2025 }, { id: 2, short_name: 'ICLR', year: 2025 }],
+        [{ id: 'p1', conf_id: 1, title: 'P1' }, { id: 'p2', conf_id: 2, title: 'P2' }],
+      );
+      const targetDb = createDb();
+      targetDb.run(CONFERENCE_SCHEMA);
+
+      const result = await importFromExternalDb(sourcePath, targetDb, []);
+      expect(result.importedConferences).toBe(2);
+      expect(result.importedPapers).toBe(2);
+
+      targetDb.close();
     });
   });
 });

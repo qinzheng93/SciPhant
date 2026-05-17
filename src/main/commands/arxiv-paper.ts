@@ -1,20 +1,8 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-
-export interface Paper {
-  id: string;
-  title: string;
-  authors: string[];
-  abstract_text: string;
-  url: string;
-  pdf_url: string;
-  published_date: string;
-  updated_date: string;
-  categories: string[];
-  fetched_at: string;
-}
+import type { ArxivPaper } from '../../shared/ipc-api.js';
 
 interface PaginatedResult {
-  items: Paper[];
+  items: ArxivPaper[];
   total: number;
   page: number;
   page_size: number;
@@ -49,7 +37,7 @@ export function listArxivPapers(db: SqlJsDatabase, paperTopicsDb: SqlJsDatabase 
 
   if (params.search) {
     const pattern = buildSearchPattern(params.search);
-    conditions.push("(p.title LIKE ? ESCAPE '\\' OR p.abstract_text LIKE ? ESCAPE '\\')");
+    conditions.push("(p.title LIKE ? ESCAPE '\\' OR p.abstract LIKE ? ESCAPE '\\')");
     bindValues.push(pattern, pattern);
   }
   if (params.fetchDate) {

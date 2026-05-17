@@ -115,12 +115,14 @@ import {
   conferenceReadImportFile,
   conferenceCheckConflicts,
   conferenceImport,
-  type ReadImportResult,
-  type SourceConference,
-  type ConflictInfo,
-  type ConflictResolution,
-  type ImportResult,
 } from '../../api'
+import type {
+  ReadImportResult,
+  SourceConference,
+  ConflictInfo,
+  ConflictResolution,
+  ImportResult,
+} from '../../../shared/ipc-api'
 
 const emit = defineEmits<{
   (e: 'close'): void

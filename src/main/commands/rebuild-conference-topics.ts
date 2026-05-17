@@ -8,7 +8,6 @@ export function rebuildConferencePaperTopics(
   return rebuildPaperTopicsAll({
     paperDb: conferenceDb,
     paperTopicsDb,
-    abstractColumn: 'abstract',
     junctionTable: 'conference_paper_topics',
   });
 }
@@ -21,7 +20,6 @@ export function updateConferenceTopicAssociations(
   return rebuildPaperTopicsSingle({
     paperDb: conferenceDb,
     paperTopicsDb,
-    abstractColumn: 'abstract',
     junctionTable: 'conference_paper_topics',
   }, topicId);
 }

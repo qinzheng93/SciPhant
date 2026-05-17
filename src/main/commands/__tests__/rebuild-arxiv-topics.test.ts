@@ -8,7 +8,7 @@ function setupArxivDb(): SqlJsDatabase {
   db.run(`CREATE TABLE IF NOT EXISTS papers (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
-    abstract_text TEXT NOT NULL DEFAULT ''
+    abstract TEXT NOT NULL DEFAULT ''
   )`);
   return db;
 }

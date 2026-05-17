@@ -118,11 +118,11 @@ export function renderMarkdownOnly(text: string): string {
   return sanitize(html)
 }
 
-const CJK_RANGE = '\\u2e80-\\u9fff\\uf900-\\ufaff\\u3400-\\u4dbf\\u3000-\\u303f\\uff00-\\uffef'
+const CJK_IDEOGRAPHS = '\\u4e00-\\u9fff\\u3400-\\u4dbf\\uf900-\\ufaff'
 
 function preprocessCJK(text: string): string {
   // Insert ZWSP between CJK char and ** to help marked recognize emphasis
   return text
-    .replace(new RegExp(`([${CJK_RANGE}])(\\*\\*)`, 'g'), '$1\u200b$2')
-    .replace(new RegExp(`(\\*\\*)([${CJK_RANGE}])`, 'g'), '$1\u200b$2')
+    .replace(new RegExp(`([${CJK_IDEOGRAPHS}])(\\*\\*)`, 'g'), '$1\u200b$2')
+    .replace(new RegExp(`(\\*\\*)([${CJK_IDEOGRAPHS}])`, 'g'), '$1\u200b$2')
 }

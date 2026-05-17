@@ -18,7 +18,7 @@ export const useAnalysisQueueStore = defineStore('analysisQueue', () => {
       const downloadStore = useDownloadQueueStore()
       await downloadStore.waitForDownload(item.id)
 
-      const offProgress = window.api.onAnalysisProgress((phase: string) => {
+      const offProgress = window.api.onAnalysisProgress((phase) => {
         progressPhase.value = phase
       })
 

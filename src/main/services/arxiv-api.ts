@@ -7,7 +7,7 @@ export interface RawPaper {
   arxiv_id: string;
   title: string;
   authors: string[];
-  abstract_text: string;
+  abstract: string;
   url: string;
   pdf_url: string;
   published_date: string;
@@ -46,10 +46,10 @@ export function savePapers(db: SqlJsDatabase, papers: RawPaper[]): [number, numb
     const authorsJson = JSON.stringify(paper.authors);
     const categoriesJson = JSON.stringify(paper.categories);
     db.run(
-      `INSERT INTO papers (id, title, authors, abstract_text, url, pdf_url, published_date, updated_date, categories, fetched_at)
+      `INSERT INTO papers (id, title, authors, abstract, url, pdf_url, published_date, updated_date, categories, fetched_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO NOTHING`,
-      [paper.arxiv_id, paper.title, authorsJson, paper.abstract_text, paper.url, paper.pdf_url, paper.published_date, paper.updated_date, categoriesJson, fetchedDate],
+      [paper.arxiv_id, paper.title, authorsJson, paper.abstract, paper.url, paper.pdf_url, paper.published_date, paper.updated_date, categoriesJson, fetchedDate],
     );
     if (db.getRowsModified() > 0) {
       inserted++;
@@ -208,7 +208,7 @@ function parseEntryFromXml(xml: string): RawPaper | null {
     arxiv_id: arxivId,
     title,
     authors,
-    abstract_text: summary,
+    abstract: summary,
     url,
     pdf_url: pdfUrl,
     published_date: published,

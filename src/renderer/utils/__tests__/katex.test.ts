@@ -79,6 +79,18 @@ describe('renderMarkdown', () => {
   it('returns empty string for empty input', () => {
     expect(renderMarkdown('')).toBe('');
   });
+
+  it('renders bold followed by CJK punctuation', () => {
+    const result = renderMarkdown('论文提出了 **Frame-wise Gated DeltaNet (GDN)**。');
+    expect(result).toContain('<strong>Frame-wise Gated DeltaNet (GDN)</strong>');
+  });
+
+  it('renders bold followed by fullwidth punctuation', () => {
+    const result = renderMarkdown('提出了一种**新方法**，效果显著');
+    expect(result).toContain('<strong>');
+    expect(result).toContain('新方法');
+    expect(result).toContain('</strong>');
+  });
 });
 
 describe('renderMarkdownOnly', () => {

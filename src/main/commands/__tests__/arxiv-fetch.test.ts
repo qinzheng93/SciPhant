@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS papers (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   authors TEXT NOT NULL,
-  abstract_text TEXT NOT NULL,
+  abstract TEXT NOT NULL,
   url TEXT NOT NULL,
   pdf_url TEXT NOT NULL,
   published_date TEXT NOT NULL,
@@ -40,9 +40,21 @@ vi.mock('../rebuild-arxiv-topics', () => ({
   rebuildArxivPaperTopics: vi.fn(),
 }));
 
+// Mock arxiv-api to control fetchFromApi for range fetch tests
+vi.mock('../../services/arxiv-api.js', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../services/arxiv-api.js')>();
+  return {
+    ...mod,
+    fetchFromApi: vi.fn(),
+  };
+});
+
 import { netFetch } from '../../services/net-fetch.js';
 import { rebuildArxivPaperTopics } from '../rebuild-arxiv-topics.js';
-import { fetchArxivPapersByIds } from '../arxiv-fetch.js';
+import { fetchFromApi } from '../../services/arxiv-api.js';
+import { fetchArxivPapersByIds, fetchArxivPapers, fetchArxivPapersThisWeek, fetchArxivPapersByDate } from '../arxiv-fetch.js';
+
+const mockedFetchFromApi = vi.mocked(fetchFromApi);
 
 const mockedNetFetch = vi.mocked(netFetch);
 const mockedRebuild = vi.mocked(rebuildArxivPaperTopics);
@@ -277,5 +289,161 @@ describe('fetchArxivPapersByIds', () => {
     expect(result.errors[0]).toContain('无法解析');
     expect(result.errors[0]).toContain('not-an-id');
     expect(mockedNetFetch).not.toHaveBeenCalled();
+  });
+});
+
+// ── fetchArxivPapers / fetchArxivPapersThisWeek / fetchArxivPapersByDate ──
+
+describe('fetchArxivPapers', () => {
+  let SQL: Awaited<ReturnType<typeof initSqlJs>>;
+
+  beforeAll(async () => {
+    SQL = await initSqlJs({ locateFile: () => 'node_modules/sql.js/dist/sql-wasm.wasm' });
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function createDbs() {
+    const db = new SQL.Database();
+    db.run(PAPERS_SCHEMA);
+    db.run('CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, enabled BOOLEAN DEFAULT TRUE)');
+    db.run("INSERT INTO categories (name, enabled) VALUES ('cs.AI', 1)");
+    db.run("INSERT INTO categories (name, enabled) VALUES ('cs.LG', 1)");
+    const topicDb = new SQL.Database();
+    topicDb.run(TOPICS_SCHEMA);
+    return { db, topicDb };
+  }
+
+  it('returns success=false when no categories enabled', async () => {
+    const { db, topicDb } = createDbs();
+    db.run('DELETE FROM categories');
+
+    const result = await fetchArxivPapers(db, topicDb, []);
+    expect(result.success).toBe(false);
+    expect(result.new_count).toBe(0);
+    expect(mockedFetchFromApi).not.toHaveBeenCalled();
+  });
+
+  it('fetches papers for given categories', async () => {
+    const { db, topicDb } = createDbs();
+    mockedFetchFromApi.mockResolvedValueOnce([
+      { arxiv_id: '2301.00001', title: 'P1', authors: [], abstract: '', url: '', pdf_url: '', published_date: '', updated_date: '', categories: [] },
+    ]);
+
+    const result = await fetchArxivPapers(db, topicDb, ['cs.AI']);
+
+    expect(result.success).toBe(true);
+    expect(result.new_count).toBe(1);
+    expect(result.existing_count).toBe(0);
+    expect(mockedFetchFromApi).toHaveBeenCalledWith('cs.AI', expect.any(String), expect.any(String));
+    expect(mockedRebuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports failed categories', async () => {
+    const { db, topicDb } = createDbs();
+    mockedFetchFromApi.mockRejectedValueOnce(new Error('timeout'));
+
+    const result = await fetchArxivPapers(db, topicDb, ['cs.AI']);
+
+    expect(result.success).toBe(true);
+    expect(result.failed_categories).toEqual(['cs.AI']);
+    expect(result.failed_details[0].error).toContain('timeout');
+  });
+
+  it('uses enabled categories when none specified', async () => {
+    const { db, topicDb } = createDbs();
+    mockedFetchFromApi.mockResolvedValue([]);
+
+    await fetchArxivPapers(db, topicDb, []);
+
+    // Should be called for both enabled categories
+    expect(mockedFetchFromApi).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('fetchArxivPapersThisWeek', () => {
+  let SQL: Awaited<ReturnType<typeof initSqlJs>>;
+
+  beforeAll(async () => {
+    SQL = await initSqlJs({ locateFile: () => 'node_modules/sql.js/dist/sql-wasm.wasm' });
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns success=false when no categories', async () => {
+    const db = new SQL.Database();
+    db.run(PAPERS_SCHEMA);
+    db.run('CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, enabled BOOLEAN DEFAULT TRUE)');
+    const topicDb = new SQL.Database();
+    topicDb.run(TOPICS_SCHEMA);
+
+    const result = await fetchArxivPapersThisWeek(db, topicDb, []);
+    expect(result.success).toBe(false);
+  });
+
+  it('fetches with 7-day range', async () => {
+    const db = new SQL.Database();
+    db.run(PAPERS_SCHEMA);
+    const topicDb = new SQL.Database();
+    topicDb.run(TOPICS_SCHEMA);
+    mockedFetchFromApi.mockResolvedValue([]);
+
+    await fetchArxivPapersThisWeek(db, topicDb, ['cs.AI']);
+
+    expect(mockedFetchFromApi).toHaveBeenCalledWith('cs.AI', expect.any(String), expect.any(String));
+    // Verify it's a ~7 day range by checking the start date
+    const call = mockedFetchFromApi.mock.calls[0];
+    const start = new Date(call[1]);
+    const end = new Date(call[2]);
+    const daysDiff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    expect(daysDiff).toBe(6); // daysAgoStr(6) to today
+  });
+});
+
+describe('fetchArxivPapersByDate', () => {
+  let SQL: Awaited<ReturnType<typeof initSqlJs>>;
+
+  beforeAll(async () => {
+    SQL = await initSqlJs({ locateFile: () => 'node_modules/sql.js/dist/sql-wasm.wasm' });
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns success=false when no categories', async () => {
+    const db = new SQL.Database();
+    db.run(PAPERS_SCHEMA);
+    const topicDb = new SQL.Database();
+    topicDb.run(TOPICS_SCHEMA);
+
+    const result = await fetchArxivPapersByDate(db, topicDb, {
+      startDate: '2025-01-01', endDate: '2025-01-07',
+    });
+    expect(result.success).toBe(false);
+    expect(result.total_count).toBe(0);
+  });
+
+  it('fetches papers for specified date range', async () => {
+    const db = new SQL.Database();
+    db.run(PAPERS_SCHEMA);
+    const topicDb = new SQL.Database();
+    topicDb.run(TOPICS_SCHEMA);
+    mockedFetchFromApi.mockResolvedValueOnce([
+      { arxiv_id: '2301.00001', title: 'P1', authors: [], abstract: '', url: '', pdf_url: '', published_date: '', updated_date: '', categories: [] },
+    ]);
+
+    const result = await fetchArxivPapersByDate(db, topicDb, {
+      startDate: '2025-01-01', endDate: '2025-01-07', categories: ['cs.AI'],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.new_count).toBe(1);
+    expect(result.total_count).toBe(1);
+    expect(mockedFetchFromApi).toHaveBeenCalledWith('cs.AI', '2025-01-01', '2025-01-07');
   });
 });

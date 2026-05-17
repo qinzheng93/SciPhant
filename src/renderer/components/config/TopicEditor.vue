@@ -61,7 +61,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useConfigStore } from '../../stores/config'
-import type { Topic } from '../../types/config'
 
 const configStore = useConfigStore()
 

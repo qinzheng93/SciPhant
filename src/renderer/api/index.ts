@@ -1,5 +1,4 @@
-import type { Paper } from '../types/paper'
-import type { Topic, LLMConfig, OutputConfig, ZoteroConfig, Category } from '../types/config'
+import type { ReadImportResult, ConflictInfo, ConflictResolution, ImportResult } from '../../shared/ipc-api'
 
 export interface PaginatedResult<T> {
   items: T[]
@@ -21,7 +20,7 @@ export const listArxivPapers = async (params: {
   fetchDate?: string
   page?: number
   pageSize?: number
-}): Promise<PaginatedResult<Paper>> => {
+}): Promise<PaginatedResult<ArxivPaper>> => {
   return window.api.listArxivPapers({
     topicIds: params.topicIds,
     search: params.search,
@@ -310,46 +309,6 @@ export const conferenceExportToZotero = async (paperId: string, collectionKey: s
 }
 
 // Conference import
-export interface SchemaIssue {
-  missingTables: string[];
-  missingColumns: { table: string; column: string }[];
-  extraColumns: { table: string; column: string }[];
-}
-
-export interface SourceConference {
-  id: number;
-  short_name: string;
-  year: number;
-  full_name: string | null;
-  paper_count: number;
-}
-
-export interface ConflictInfo {
-  source: SourceConference;
-  targetPaperCount: number;
-}
-
-export interface ConflictResolution {
-  short_name: string;
-  year: number;
-  action: 'skip' | 'overwrite_keep_analysis' | 'overwrite_clear_analysis';
-}
-
-export interface ReadImportResult {
-  filePath: string;
-  valid: boolean;
-  issues?: SchemaIssue;
-  conferences?: SourceConference[];
-}
-
-export interface ImportResult {
-  success: boolean;
-  importedConferences: number;
-  importedPapers: number;
-  skippedConferences: number;
-  error?: string;
-}
-
 export const conferenceReadImportFile = async (): Promise<ReadImportResult | null> => {
   return window.api.conferenceReadImportFile()
 }

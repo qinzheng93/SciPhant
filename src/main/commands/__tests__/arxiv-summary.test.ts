@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS papers (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   authors TEXT NOT NULL,
-  abstract_text TEXT NOT NULL,
+  abstract TEXT NOT NULL,
   url TEXT NOT NULL,
   pdf_url TEXT NOT NULL,
   published_date TEXT NOT NULL,
@@ -50,7 +50,7 @@ function insertPaper(
   abstractText: string,
 ) {
   db.run(
-    `INSERT INTO papers (id, title, authors, abstract_text, url, pdf_url, published_date, updated_date, categories, fetched_at)
+    `INSERT INTO papers (id, title, authors, abstract, url, pdf_url, published_date, updated_date, categories, fetched_at)
      VALUES (?, ?, '[]', ?, '', '', '2024-01-01', '2024-01-01', '[]', '2024-01-01')`,
     [id, title, abstractText],
   );

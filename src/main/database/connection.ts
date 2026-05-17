@@ -19,6 +19,7 @@ export function getSqlJs(): Promise<SqlJsStatic> {
 
 export const ARXIV_MIGRATIONS = [
   { name: '001_initial', filename: '001_initial.sql' },
+  { name: '002_rename_abstract', filename: '002_rename_abstract.sql' },
 ];
 
 export const CONFERENCE_MIGRATIONS = [

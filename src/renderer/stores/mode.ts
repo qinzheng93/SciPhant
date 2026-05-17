@@ -19,11 +19,16 @@ export const useModeStore = defineStore('mode', () => {
   let initialized = false
 
   async function toggleMode() {
-    mode.value = mode.value === 'arxiv' ? 'conference' : 'arxiv'
-    if (mode.value === 'conference' && !initialized) {
-      await useConferencePapersStore().loadConferences()
-      await useConferencePapersStore().loadPapers()
-      initialized = true
+    if (mode.value === 'arxiv') {
+      // Preload conference data BEFORE switching mode to avoid empty-state flicker
+      if (!initialized) {
+        await useConferencePapersStore().loadConferences()
+        await useConferencePapersStore().loadPapers()
+        initialized = true
+      }
+      mode.value = 'conference'
+    } else {
+      mode.value = 'arxiv'
     }
   }
 

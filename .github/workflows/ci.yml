@@ -23,6 +23,9 @@ jobs:
       - name: Type check (web)
         run: npm run typecheck:web
 
+      - name: Type check (main)
+        run: npm run typecheck:main
+
       - name: Run tests
         run: npm test
 

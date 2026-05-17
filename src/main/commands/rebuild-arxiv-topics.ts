@@ -8,7 +8,6 @@ export function rebuildArxivPaperTopics(
   return rebuildPaperTopicsAll({
     paperDb: arxivDb,
     paperTopicsDb,
-    abstractColumn: 'abstract_text',
     junctionTable: 'arxiv_paper_topics',
   });
 }
@@ -21,7 +20,6 @@ export function updateArxivTopicAssociations(
   return rebuildPaperTopicsSingle({
     paperDb: arxivDb,
     paperTopicsDb,
-    abstractColumn: 'abstract_text',
     junctionTable: 'arxiv_paper_topics',
   }, topicId);
 }

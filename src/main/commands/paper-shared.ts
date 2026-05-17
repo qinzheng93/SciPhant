@@ -1,7 +1,7 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import type { Paper } from './arxiv-paper.js';
+import type { ArxivPaper } from '../../shared/ipc-api.js';
 import type { DeepAnalysisResult } from '../services/llm-client.js';
-import type { Topic } from '../services/filter.js';
+import type { Topic } from '../../shared/ipc-api.js';
 import { filterPaperTopics } from '../services/filter.js';
 import { LLMClient } from '../services/llm-client.js';
 import { loadLLMConfig } from './config.js';
@@ -9,16 +9,16 @@ import { extractTextFromUrl } from '../services/pdf-extractor.js';
 import { writeAnalysisFile, readAnalysisFile } from '../services/analysis-files.js';
 
 export const BASE_SQL = `SELECT
-    p.id, p.title, p.authors, p.abstract_text, p.url, p.pdf_url,
+    p.id, p.title, p.authors, p.abstract, p.url, p.pdf_url,
     p.published_date, p.updated_date, p.categories, p.fetched_at
 FROM papers p`;
 
-export function rowToPaper(row: Record<string, unknown>): Paper {
+export function rowToPaper(row: Record<string, unknown>): ArxivPaper {
   return {
     ...row,
     authors: JSON.parse(row.authors as string),
     categories: JSON.parse(row.categories as string),
-  } as Paper;
+  } as ArxivPaper;
 }
 
 export function execResultToPaperRows(results: { columns: string[]; values: unknown[][] }): Record<string, unknown>[] {
@@ -179,13 +179,12 @@ export function loadSingleTopic(paperTopicsDb: SqlJsDatabase, topicId: number): 
 export interface RebuildOptions {
   paperDb: SqlJsDatabase;
   paperTopicsDb: SqlJsDatabase;
-  abstractColumn: string;
   junctionTable: 'arxiv_paper_topics' | 'conference_paper_topics';
 }
 
 export function rebuildPaperTopicsAll(opts: RebuildOptions): number {
   const topics = loadEnabledTopics(opts.paperTopicsDb);
-  const paperRows = opts.paperDb.exec(`SELECT id, title, ${opts.abstractColumn} FROM papers`);
+  const paperRows = opts.paperDb.exec('SELECT id, title, abstract FROM papers');
   if (paperRows.length === 0) return 0;
   const count = paperRows[0].values.length;
   opts.paperTopicsDb.run('BEGIN TRANSACTION');
@@ -213,7 +212,7 @@ export function rebuildPaperTopicsSingle(opts: RebuildOptions, topicId: number):
     return 0;
   }
   opts.paperTopicsDb.run(`DELETE FROM ${opts.junctionTable} WHERE topic_id = ?`, [topicId]);
-  const paperRows = opts.paperDb.exec(`SELECT id, title, ${opts.abstractColumn} FROM papers`);
+  const paperRows = opts.paperDb.exec('SELECT id, title, abstract FROM papers');
   if (paperRows.length === 0) return 0;
   let count = 0;
   opts.paperTopicsDb.run('BEGIN TRANSACTION');

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { matchesKeywords, filterPaperTopics, type Topic } from '../filter.js';
+import { matchesKeywords, filterPaperTopics } from '../filter.js';
+import type { Topic } from '../../../shared/ipc-api.js';
 
 describe('matchesKeywords', () => {
   it('returns true when text contains a keyword', () => {

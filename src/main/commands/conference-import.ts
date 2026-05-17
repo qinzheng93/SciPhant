@@ -1,15 +1,10 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import * as fs from 'fs/promises';
+import type { SchemaIssue, SourceConference, ConflictInfo, ConflictResolution, ImportResult } from '../../shared/ipc-api.js';
 import { getSqlJs } from '../database/connection.js';
 import { deleteAnalysisFile } from '../services/analysis-files.js';
 
 // ── Schema Validation ──
-
-export interface SchemaIssue {
-  missingTables: string[];
-  missingColumns: { table: string; column: string }[];
-  extraColumns: { table: string; column: string }[];
-}
 
 const REQUIRED_SCHEMA: Record<string, string[]> = {
   conferences: ['id', 'short_name', 'year', 'full_name'],
@@ -65,14 +60,6 @@ export function hasSchemaIssues(issues: SchemaIssue): boolean {
 
 // ── Source Conference Listing ──
 
-export interface SourceConference {
-  id: number;
-  short_name: string;
-  year: number;
-  full_name: string | null;
-  paper_count: number;
-}
-
 export function listSourceConferences(db: SqlJsDatabase): SourceConference[] {
   const results = db.exec(
     `SELECT c.id, c.short_name, c.year, c.full_name, COUNT(p.id) as paper_count
@@ -90,11 +77,6 @@ export function listSourceConferences(db: SqlJsDatabase): SourceConference[] {
 }
 
 // ── Find Conflicting Conferences ──
-
-export interface ConflictInfo {
-  source: SourceConference;
-  targetPaperCount: number;
-}
 
 export function findConflicts(
   targetDb: SqlJsDatabase,
@@ -118,20 +100,6 @@ export function findConflicts(
 }
 
 // ── Import Logic ──
-
-export interface ConflictResolution {
-  short_name: string;
-  year: number;
-  action: 'skip' | 'overwrite_keep_analysis' | 'overwrite_clear_analysis';
-}
-
-export interface ImportResult {
-  success: boolean;
-  importedConferences: number;
-  importedPapers: number;
-  skippedConferences: number;
-  error?: string;
-}
 
 export async function clearAnalysisForConference(
   dataDir: string,

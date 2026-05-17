@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Paper } from '../types/paper'
 import type { FetchDate } from '../api'
 import { listArxivPapers, checkArxivSummaryStatus, listArxivFetchDates } from '../api'
 
@@ -8,7 +7,7 @@ const PAGE_SIZE = 20
 
 export const usePapersStore = defineStore('papers', () => {
   // State
-  const papers = ref<Paper[]>([])
+  const papers = ref<ArxivPaper[]>([])
   const fetchDates = ref<FetchDate[]>([])
   const selectedPaperIds = ref<string[]>([])
   const selectedDate = ref<string | null>(null) // null = "全部"

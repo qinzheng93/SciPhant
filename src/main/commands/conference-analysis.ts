@@ -1,4 +1,5 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
+import type { DeepAnalysisResult } from '../services/llm-client.js';
 import { getCategoryForConference } from './conference-summary.js';
 import { createAbortControllerManager, analyzeFullPaperCore, getPaperAnalysisContent, type ProgressCallback } from './paper-shared.js';
 
@@ -19,7 +20,7 @@ export async function analyzeConferenceFullPaper(
   paperId: string,
   signal?: AbortSignal,
   onProgress?: ProgressCallback,
-): Promise<{ success: boolean; result?: import('../services/llm-client.js').DeepAnalysisResult }> {
+): Promise<{ success: boolean; result?: DeepAnalysisResult }> {
   const category = getCategoryForConference(conferenceDb, paperId);
   if (!category) throw new Error(`Conference category not found for paper ${paperId}`);
 

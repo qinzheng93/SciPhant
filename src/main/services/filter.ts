@@ -1,9 +1,4 @@
-export interface Topic {
-  id: number;
-  name: string;
-  keywords: string[];
-  enabled: boolean;
-}
+import type { Topic } from '../../shared/ipc-api.js';
 
 /**
  * Check if text matches any keyword (case-insensitive).

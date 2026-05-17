@@ -1,36 +1,13 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import { app } from 'electron';
-import type { Topic } from '../services/filter.js';
+import type { Topic, LLMConfig, OutputConfig, ZoteroConfig, Category } from '../../shared/ipc-api.js';
 import { fetchCollections } from '../services/zotero-client.js';
-
-export interface LLMConfig {
-  api_key: string;
-  base_url: string;
-  model: string;
-  temperature: number;
-}
-
-export interface OutputConfig {
-  output_dir: string;
-  auto_save: boolean;
-}
-
-export interface ZoteroConfig {
-  api_key: string;
-  user_id: string;
-}
 
 export interface ConfigResponse {
   llm: LLMConfig;
   output: OutputConfig;
   zotero?: ZoteroConfig;
   theme?: string;
-}
-
-export interface Category {
-  id: number;
-  name: string;
-  enabled: boolean;
 }
 
 /**

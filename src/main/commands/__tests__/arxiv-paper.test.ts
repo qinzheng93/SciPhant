@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS papers (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   authors TEXT NOT NULL,
-  abstract_text TEXT NOT NULL,
+  abstract TEXT NOT NULL,
   url TEXT NOT NULL,
   pdf_url TEXT NOT NULL,
   published_date TEXT NOT NULL,
@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_arxiv_pt_tid ON arxiv_paper_topics(topic_id, pape
 
 function insertPaper(db: SqlJsDatabase, id: string, title: string, updatedDate: string) {
   db.run(
-    `INSERT INTO papers (id, title, authors, abstract_text, url, pdf_url, published_date, updated_date, categories, fetched_at)
+    `INSERT INTO papers (id, title, authors, abstract, url, pdf_url, published_date, updated_date, categories, fetched_at)
      VALUES (?, ?, '[]', '', '', '', ?, ?, '[]', ?)`,
     [id, title, updatedDate, updatedDate, updatedDate],
   );
@@ -99,7 +99,7 @@ describe('listArxivPapers', () => {
 
   it('filters by search query on abstract', () => {
     insertPaper(db, '1', 'Paper A', '2024-03-10');
-    db.run("UPDATE papers SET abstract_text = 'This is about neural networks' WHERE id = '1'");
+    db.run("UPDATE papers SET abstract = 'This is about neural networks' WHERE id = '1'");
     insertPaper(db, '2', 'Paper B', '2024-03-10');
     const result = listArxivPapers(db, null, { search: 'neural' });
     expect(result.items).toHaveLength(1);

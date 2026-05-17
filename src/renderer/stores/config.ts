@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, watch, toRaw } from 'vue'
-import type { Topic, LLMConfig, OutputConfig, ZoteroConfig, Category } from '../types/config'
 import { useToastStore } from './toast'
 import {
   listTopics, saveTopic as apiSaveTopic, deleteTopic as apiDeleteTopic,

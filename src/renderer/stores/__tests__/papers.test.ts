@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import type { Paper } from '../../types/paper'
 
 // Mock API before importing store
 vi.mock('../../api', () => ({
@@ -20,12 +19,12 @@ const mockedListArxivPapers = vi.mocked(listArxivPapers)
 const mockedCheckArxivSummaryStatus = vi.mocked(checkArxivSummaryStatus)
 const mockedListArxivFetchDates = vi.mocked(listArxivFetchDates)
 
-function makePaper(overrides: Partial<Paper> = {}): Paper {
+function makePaper(overrides: Partial<ArxivPaper> = {}): ArxivPaper {
   return {
     id: 'paper-1',
     title: 'Test Paper',
     authors: ['Author A'],
-    abstract_text: 'Abstract',
+    abstract: 'Abstract',
     url: 'https://arxiv.org/abs/paper-1',
     pdf_url: 'https://arxiv.org/pdf/paper-1',
     published_date: '2025-01-01',

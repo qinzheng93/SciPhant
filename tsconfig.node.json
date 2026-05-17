@@ -9,8 +9,8 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "outDir": "dist/main",
-    "rootDir": "src/main"
+    "outDir": "dist",
+    "rootDir": "src"
   },
-  "include": ["src/main/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/shared/**/*.ts"]
 }

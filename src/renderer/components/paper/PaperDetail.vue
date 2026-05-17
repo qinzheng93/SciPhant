@@ -10,8 +10,8 @@
       <div class="detail-meta">
         <p><strong>作者：</strong>{{ paper.authors.join(', ') }}</p>
         <template v-if="!isConference">
-          <p><strong>分类：</strong>{{ (paper as Paper).categories.join(', ') }}</p>
-          <p><strong>更新时间：</strong>{{ formatDateFull((paper as Paper).updated_date) }}</p>
+          <p><strong>分类：</strong>{{ (paper as ArxivPaper).categories.join(', ') }}</p>
+          <p><strong>更新时间：</strong>{{ formatDateFull((paper as ArxivPaper).updated_date) }}</p>
           <p><strong>arXiv ID：</strong>{{ paper.id }}</p>
         </template>
         <template v-else>
@@ -24,7 +24,7 @@
       <div class="detail-actions">
         <!-- arxiv: open arXiv link -->
         <template v-if="!isConference">
-          <a :href="(paper as Paper).url" target="_blank" rel="noopener noreferrer" class="action-link action-pdf">arXiv</a>
+          <a :href="(paper as ArxivPaper).url" target="_blank" rel="noopener noreferrer" class="action-link action-pdf">arXiv</a>
         </template>
         <!-- conference: open detail page + arxiv link -->
         <template v-else>
@@ -112,7 +112,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import type { Paper } from '../../types/paper'
 import { useSummaryQueueStore } from '../../stores/summaryQueue'
 import { useAnalysisQueueStore } from '../../stores/analysisQueue'
 import { useDownloadQueueStore } from '../../stores/downloadQueue'
@@ -127,7 +126,7 @@ import type { ZoteroCollection } from '../../api'
 import 'katex/dist/katex.min.css'
 
 const props = defineProps<{
-  paper: Paper | ConferencePaper | null
+  paper: ArxivPaper | ConferencePaper | null
   selectedCount?: number
 }>()
 
@@ -162,7 +161,7 @@ const hasAnalysis = computed(() => analysisContent.value !== null && analysisCon
 const abstractText = computed(() => {
   if (!props.paper) return ''
   if (isConference.value) return (props.paper as ConferencePaper).abstract || ''
-  return (props.paper as Paper).abstract_text || ''
+  return (props.paper as ArxivPaper).abstract || ''
 })
 
 // Conference papers may not have PDF

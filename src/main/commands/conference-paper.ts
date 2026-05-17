@@ -1,33 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
+import type { ConferencePaper, ConferenceInfo } from '../../shared/ipc-api.js';
 import { execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared.js';
-
-
-
-export interface ConferencePaper {
-  id: string;
-  conference_id: number;
-  short_name: string;
-  year: number;
-  full_name: string;
-  title: string;
-  authors: string[];
-  abstract: string;
-  pdf_url: string | null;
-  supp_url: string | null;
-  arxiv_url: string | null;
-  bibtex: string | null;
-  pages: string | null;
-  track: string | null;
-  detail_url: string | null;
-}
-
-export interface ConferenceInfo {
-  id: number;
-  short_name: string;
-  year: number;
-  full_name: string;
-  paper_count: number;
-}
 
 interface ConferencePaginatedResult {
   items: ConferencePaper[];
