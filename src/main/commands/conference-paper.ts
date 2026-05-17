@@ -93,7 +93,7 @@ export function listConferences(conferenceDb: SqlJsDatabase): ConferenceInfo[] {
 
 export function listConferencePapers(
   conferenceDb: SqlJsDatabase,
-  arxivDb: SqlJsDatabase | null,
+  _arxivDb: SqlJsDatabase | null,
   paperTopicsDb: SqlJsDatabase | null,
   params: {
     conferenceId?: number | null;

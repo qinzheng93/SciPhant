@@ -725,9 +725,14 @@ async function filterNeedsSummary(
   checkStatusFn: (ids: string[]) => Promise<Record<string, boolean>>,
   papers: { id: string; title: string }[],
 ): Promise<{ id: string; title: string }[]> {
-  const ids = papers.map(p => p.id)
-  const statuses = await checkStatusFn(ids)
-  return papers.filter(p => !statuses[p.id])
+  const BATCH_SIZE = 200
+  const allStatuses: Record<string, boolean> = {}
+  for (let i = 0; i < papers.length; i += BATCH_SIZE) {
+    const batch = papers.slice(i, i + BATCH_SIZE)
+    const statuses = await checkStatusFn(batch.map(p => p.id))
+    Object.assign(allStatuses, statuses)
+  }
+  return papers.filter(p => !allStatuses[p.id])
 }
 
 const summarizeCurrentPapers = async () => {

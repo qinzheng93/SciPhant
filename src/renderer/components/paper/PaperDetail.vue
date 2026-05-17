@@ -314,7 +314,7 @@ const doDeleteAnalysis = async () => {
 }
 
 const copyBibtex = async () => {
-  if (!props.paper || isConference.value) return
+  if (!props.paper || !isConference.value) return
   const bibtex = (props.paper as ConferencePaper).bibtex
   if (!bibtex) return
   try {

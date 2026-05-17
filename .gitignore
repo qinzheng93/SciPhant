@@ -22,3 +22,6 @@ dist/
 # Electron
 release/
 *.tsbuildinfo
+
+# Test
+test-results/

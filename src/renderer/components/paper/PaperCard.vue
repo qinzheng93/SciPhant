@@ -66,10 +66,10 @@ const onCardClick = (e: MouseEvent) => {
   } else {
     if (modeStore.isConference) {
       conferenceStore.clearSelection()
-      conferenceStore.selectedPaperIds.push(props.paper.id)
+      conferenceStore.toggleSelection(props.paper.id)
     } else {
       papersStore.clearSelection()
-      papersStore.selectedPaperIds.push(props.paper.id)
+      papersStore.toggleSelection(props.paper.id)
     }
     emit('select', props.paper.id)
   }

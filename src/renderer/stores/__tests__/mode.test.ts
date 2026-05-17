@@ -16,6 +16,7 @@ vi.stubGlobal('localStorage', localStorageMock);
 describe('useModeStore', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    vi.resetModules();
     setActivePinia(createPinia());
   });
 

@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, unlink, readdir, rm, rename } from 'fs/promises';
+import { mkdir, writeFile, readFile, readdir, rm, rename } from 'fs/promises';
 import { join } from 'path';
 
 export type AnalysisType = 'summaries' | 'analyses';
@@ -63,7 +63,7 @@ export async function deleteAnalysisFile(
   paperId: string,
 ): Promise<void> {
   const filePath = buildFilePath(dataDir, type, category, paperId);
-  await unlink(filePath);
+  await rm(filePath, { force: true });
 }
 
 /**

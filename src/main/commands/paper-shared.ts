@@ -1,6 +1,8 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import type { Paper } from './arxiv-paper.js';
 import type { DeepAnalysisResult } from '../services/llm-client.js';
+import type { Topic } from '../services/filter.js';
+import { filterPaperTopics } from '../services/filter.js';
 import { LLMClient } from '../services/llm-client.js';
 import { loadLLMConfig } from './config.js';
 import { extractTextFromUrl } from '../services/pdf-extractor.js';
@@ -46,16 +48,7 @@ export function createAbortControllerManager() {
 }
 
 export function loadEnabledTopicNames(paperTopicsDb: SqlJsDatabase): string[] {
-  const topicRows = paperTopicsDb.exec('SELECT id, name, keywords, enabled FROM topics WHERE enabled = TRUE');
-  const allTopics = topicRows.length > 0
-    ? topicRows[0].values.map(row => ({
-      id: row[0] as number,
-      name: row[1] as string,
-      keywords: JSON.parse(row[2] as string),
-      enabled: Boolean(row[3]),
-    }))
-    : [];
-  return allTopics.map(t => t.name);
+  return loadEnabledTopics(paperTopicsDb).map(t => t.name);
 }
 
 export function createLLMClient(settingsDb: SqlJsDatabase): LLMClient {
@@ -132,9 +125,12 @@ export async function summarizePaperCore(
   return { success: true, summary: result.analysis, skipped: false };
 }
 
+const VALID_JUNCTION_TABLES = ['arxiv_paper_topics', 'conference_paper_topics'] as const;
+type JunctionTable = typeof VALID_JUNCTION_TABLES[number];
+
 export function filterByTopicIds(
   paperTopicsDb: SqlJsDatabase,
-  junctionTable: string,
+  junctionTable: JunctionTable,
   topicIds: number[],
   conditions: string[],
   bindValues: unknown[],
@@ -152,4 +148,87 @@ export function filterByTopicIds(
   } else {
     conditions.push('1 = 0');
   }
+}
+
+// ── Shared topic loading helpers ──
+
+export function loadEnabledTopics(paperTopicsDb: SqlJsDatabase): Topic[] {
+  const topicRows = paperTopicsDb.exec('SELECT id, name, keywords, enabled FROM topics WHERE enabled = TRUE');
+  return topicRows.length > 0
+    ? topicRows[0].values.map(row => ({
+        id: row[0] as number,
+        name: row[1] as string,
+        keywords: JSON.parse(row[2] as string),
+        enabled: Boolean(row[3]),
+      }))
+    : [];
+}
+
+export function loadSingleTopic(paperTopicsDb: SqlJsDatabase, topicId: number): Topic | null {
+  const topicRows = paperTopicsDb.exec('SELECT id, name, keywords, enabled FROM topics WHERE id = ?', [topicId]);
+  if (topicRows.length === 0 || !topicRows[0].values.length) return null;
+  const row = topicRows[0].values[0];
+  return {
+    id: row[0] as number,
+    name: row[1] as string,
+    keywords: JSON.parse(row[2] as string),
+    enabled: Boolean(row[3]),
+  };
+}
+
+export interface RebuildOptions {
+  paperDb: SqlJsDatabase;
+  paperTopicsDb: SqlJsDatabase;
+  abstractColumn: string;
+  junctionTable: 'arxiv_paper_topics' | 'conference_paper_topics';
+}
+
+export function rebuildPaperTopicsAll(opts: RebuildOptions): number {
+  const topics = loadEnabledTopics(opts.paperTopicsDb);
+  const paperRows = opts.paperDb.exec(`SELECT id, title, ${opts.abstractColumn} FROM papers`);
+  if (paperRows.length === 0) return 0;
+  const count = paperRows[0].values.length;
+  opts.paperTopicsDb.run('BEGIN TRANSACTION');
+  opts.paperTopicsDb.run(`DELETE FROM ${opts.junctionTable}`);
+  for (const row of paperRows[0].values) {
+    const paperId = row[0] as string;
+    const title = row[1] as string;
+    const abstract = row[2] as string;
+    for (const topicId of filterPaperTopics(title, abstract, topics)) {
+      opts.paperTopicsDb.run(
+        `INSERT OR IGNORE INTO ${opts.junctionTable} (paper_id, topic_id) VALUES (?, ?)`,
+        [paperId, topicId],
+      );
+    }
+  }
+  opts.paperTopicsDb.run('COMMIT');
+  return count;
+}
+
+export function rebuildPaperTopicsSingle(opts: RebuildOptions, topicId: number): number {
+  const topic = loadSingleTopic(opts.paperTopicsDb, topicId);
+  if (!topic) return 0;
+  if (!topic.enabled) {
+    opts.paperTopicsDb.run(`DELETE FROM ${opts.junctionTable} WHERE topic_id = ?`, [topicId]);
+    return 0;
+  }
+  opts.paperTopicsDb.run(`DELETE FROM ${opts.junctionTable} WHERE topic_id = ?`, [topicId]);
+  const paperRows = opts.paperDb.exec(`SELECT id, title, ${opts.abstractColumn} FROM papers`);
+  if (paperRows.length === 0) return 0;
+  let count = 0;
+  opts.paperTopicsDb.run('BEGIN TRANSACTION');
+  for (const row of paperRows[0].values) {
+    const paperId = row[0] as string;
+    const title = row[1] as string;
+    const abstract = row[2] as string;
+    if (filterPaperTopics(title, abstract, [topic]).length > 0) {
+      opts.paperTopicsDb.run(
+        `INSERT OR IGNORE INTO ${opts.junctionTable} (paper_id, topic_id) VALUES (?, ?)`,
+        [paperId, topicId],
+      );
+      count++;
+    }
+  }
+  opts.paperTopicsDb.run('COMMIT');
+  return count;
 }

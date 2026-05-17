@@ -38,7 +38,8 @@ async function downloadStreaming(
   if (!response.ok) throw new Error(`下载失败 (HTTP ${response.status})`);
 
   const total = parseInt(response.headers.get('content-length') || '', 10) || undefined;
-  const reader = response.body!.getReader();
+  if (!response.body) throw new Error('下载失败: 响应体为空');
+  const reader = response.body.getReader();
   const tmpPath = `${filePath}.tmp`;
   const file = await open(tmpPath, 'w');
   let loaded = 0;

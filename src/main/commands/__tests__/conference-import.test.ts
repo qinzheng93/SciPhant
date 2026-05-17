@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
 import {

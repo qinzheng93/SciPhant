@@ -1,6 +1,5 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import {
-  writeAnalysisFile,
   readAnalysisFile,
   listExistingPaperIds,
 } from '../services/analysis-files.js';

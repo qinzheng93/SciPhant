@@ -71,7 +71,7 @@ interface ConferenceInfo {
   id: number
   short_name: string
   year: number
-  full_name: string
+  full_name: string | null
   paper_count: number
 }
 
@@ -182,9 +182,22 @@ interface ElectronAPI {
   conferenceExportToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => Promise<{ success: boolean; itemKey: string }>
 
   // Conference import
-  conferenceReadImportFile: () => Promise<any>
-  conferenceCheckConflicts: (filePath: string, selectedIds: number[]) => Promise<any>
-  conferenceImport: (options: unknown) => Promise<any>
+  conferenceReadImportFile: () => Promise<{
+    filePath: string;
+    valid: boolean;
+    issues?: { missingTables: string[]; missingColumns: { table: string; column: string }[]; extraColumns: { table: string; column: string }[] };
+    conferences?: { id: number; short_name: string; year: number; full_name: string | null; paper_count: number }[];
+  } | null>
+  conferenceCheckConflicts: (filePath: string, selectedIds: number[]) => Promise<
+    { source: { id: number; short_name: string; year: number; full_name: string | null; paper_count: number }; targetPaperCount: number }[]
+  >
+  conferenceImport: (options: { filePath: string; resolutions: { short_name: string; year: number; action: 'skip' | 'overwrite_keep_analysis' | 'overwrite_clear_analysis' }[]; selectedConferenceIds?: number[] }) => Promise<{
+    success: boolean;
+    importedConferences: number;
+    importedPapers: number;
+    skippedConferences: number;
+    error?: string;
+  }>
 }
 
 interface Window {

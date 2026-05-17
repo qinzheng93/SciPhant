@@ -17,8 +17,8 @@ export const useDownloadQueueStore = defineStore('downloadQueue', () => {
   const currentProgress = ref(0)
   const isRunning = ref(false)
 
-  // paperId -> array of resolve callbacks waiting for download completion
-  const waiters = new Map<string, Array<(filePath: string) => void>>()
+  // paperId -> array of waiter callbacks
+  const waiters = new Map<string, Array<{ resolve: (filePath: string) => void; reject: (error: Error) => void }>>()
   // paperId -> filePath (result of successful download)
   const completedPaths = new Map<string, string>()
 
@@ -74,11 +74,11 @@ export const useDownloadQueueStore = defineStore('downloadQueue', () => {
     if (cached) return paperId
 
     // Register as waiter
-    return new Promise<string>((resolve) => {
+    return new Promise<string>((resolve, reject) => {
       if (!waiters.has(paperId)) {
         waiters.set(paperId, [])
       }
-      waiters.get(paperId)!.push(resolve)
+      waiters.get(paperId)!.push({ resolve, reject })
 
       // If not already in queue, enqueue it
       if (!isInQueue(paperId)) {
@@ -92,8 +92,8 @@ export const useDownloadQueueStore = defineStore('downloadQueue', () => {
   function resolveWaiters(paperId: string, filePath: string): void {
     const callbacks = waiters.get(paperId)
     if (callbacks) {
-      for (const cb of callbacks) {
-        cb(filePath)
+      for (const { resolve } of callbacks) {
+        resolve(filePath)
       }
       waiters.delete(paperId)
     }
@@ -103,8 +103,8 @@ export const useDownloadQueueStore = defineStore('downloadQueue', () => {
   function rejectWaiters(paperId: string): void {
     const callbacks = waiters.get(paperId)
     if (callbacks) {
-      for (const cb of callbacks) {
-        cb('') // resolve with empty string — analysis will fail naturally
+      for (const { reject } of callbacks) {
+        reject(new Error('PDF 下载失败'))
       }
       waiters.delete(paperId)
     }
@@ -155,8 +155,6 @@ export const useDownloadQueueStore = defineStore('downloadQueue', () => {
       currentPaperTitle.value = ''
       currentProgress.value = 0
       isRunning.value = false
-      // Cleanup old completed paths
-      completedPaths.clear()
     }
   }
 

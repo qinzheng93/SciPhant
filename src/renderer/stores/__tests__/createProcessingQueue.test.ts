@@ -125,19 +125,19 @@ describe('createProcessingQueue', () => {
       expect(testQueue.errorCount.value).toBe(1);
     });
 
-    it('does not start if already running', () => {
-      // Call processQueue directly - should return immediately if running
+    it('does not duplicate processing when called while running', async () => {
+      const processItem = vi.fn().mockImplementation(async () => {
+        await new Promise(r => setTimeout(r, 10));
+      });
       const testQueue = createProcessingQueue({
         name: 'test',
-        processItem: async () => {},
+        processItem,
         stopApi: vi.fn().mockResolvedValue({ success: true }),
       });
-      // Manually start processing
       testQueue.enqueue([{ id: '1', title: 'A' }]);
-      // processQueue is called from enqueue, try calling again
-      const result = testQueue.processQueue();
-      expect(result).rejects; // The guard returns early, so completedCount should only be 1
-      // Actually processQueue returns void, and it checks isRunning at the top
+      // Call processQueue again while running — should be a no-op
+      await testQueue.processQueue();
+      expect(processItem).toHaveBeenCalledTimes(1);
     });
 
     it('stops when stopRequested is set', async () => {

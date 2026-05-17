@@ -1,8 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import * as fs from 'fs/promises';
-import * as fsSync from 'fs';
-import { join } from 'path';
-import initSqlJs from 'sql.js';
+import { getSqlJs } from '../database/connection.js';
 import { deleteAnalysisFile } from '../services/analysis-files.js';
 
 // ── Schema Validation ──
@@ -40,7 +38,7 @@ export function validateConferenceSchema(db: SqlJsDatabase): SchemaIssue {
       continue;
     }
 
-    const colResults = db.exec(`PRAGMA table_info(${table})`);
+    const colResults = db.exec(`PRAGMA table_info(${table.replace(/[^a-zA-Z_]/g, '')})`);
     if (colResults.length === 0) continue;
     const existingCols = new Set(colResults[0].values.map(r => r[1] as string));
 
@@ -169,9 +167,7 @@ export async function importFromExternalDb(
   dataDir?: string,
   selectedConferenceIds?: number[],
 ): Promise<ImportResult> {
-  const SQL = await initSqlJs({
-    locateFile: (file: string) => join(__dirname, '..', 'wasm', file),
-  });
+  const SQL = await getSqlJs();
   const buffer = await fs.readFile(sourcePath);
   const sourceDb = new SQL.Database(buffer);
 

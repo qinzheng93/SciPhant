@@ -1,5 +1,4 @@
 import { app, BrowserWindow, shell, Menu, session } from 'electron';
-import { existsSync } from 'fs';
 import { join } from 'path';
 import { Database, CONFERENCE_MIGRATIONS } from './database/connection.js';
 import { SettingsDb } from './database/settings.js';
@@ -14,34 +13,38 @@ let conferenceDb: Database | null = null;
 let settingsDb: SettingsDb | null = null;
 let paperTopicsDb: PaperTopicsDb | null = null;
 
-app.on('before-quit', async () => {
-  if (arxivDb) {
-    await arxivDb.close();
-    arxivDb = null;
-  }
-  if (settingsDb) {
-    await settingsDb.close();
-    settingsDb = null;
-  }
-  if (paperTopicsDb) {
-    await paperTopicsDb.close();
-    paperTopicsDb = null;
-  }
-  if (conferenceDb) {
-    conferenceDb.getDb().close();
-    conferenceDb = null;
-  }
+let isQuitting = false;
+
+app.on('before-quit', (event) => {
+  if (isQuitting) return;
+  event.preventDefault();
+  isQuitting = true;
+
+  const closeAll = async () => {
+    try {
+      if (arxivDb) { await arxivDb.close(); arxivDb = null; }
+      if (settingsDb) { await settingsDb.close(); settingsDb = null; }
+      if (paperTopicsDb) { await paperTopicsDb.close(); paperTopicsDb = null; }
+      if (conferenceDb) { await conferenceDb.close(); conferenceDb = null; }
+    } catch (err) {
+      console.error('Error closing databases:', err);
+    }
+    app.quit();
+  };
+
+  closeAll();
 });
 
 function createWindow(): BrowserWindow {
-  // Set Content-Security-Policy for all requests
+  // Set Content-Security-Policy — strict in production, relaxed for dev (Vite HMR needs eval)
+  const devCsp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:*; font-src 'self' data:";
+  const prodCsp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; font-src 'self' data:";
+  const csp = app.isPackaged ? prodCsp : devCsp;
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:*; font-src 'self' data:"
-        ],
+        'Content-Security-Policy': [csp],
       },
     });
   });

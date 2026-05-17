@@ -69,8 +69,8 @@ describe('deleteAnalysisFile', () => {
     expect(content).toBeNull();
   });
 
-  it('throws for non-existent file', async () => {
-    await expect(deleteAnalysisFile(dataDir, 'summaries', ARXIV_CATEGORY, 'nonexistent')).rejects.toThrow();
+  it('silently ignores non-existent file', async () => {
+    await expect(deleteAnalysisFile(dataDir, 'summaries', ARXIV_CATEGORY, 'nonexistent')).resolves.toBeUndefined();
   });
 });
 

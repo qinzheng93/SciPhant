@@ -1,8 +1,8 @@
-import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
+import { getSqlJs } from './connection.js';
 
 export class PaperTopicsDb {
   private db: SqlJsDatabase | null = null;
@@ -16,9 +16,7 @@ export class PaperTopicsDb {
     const dir = dirname(this.dbPath);
     await fs.mkdir(dir, { recursive: true });
 
-    const SQL = await initSqlJs({
-      locateFile: (file: string) => join(__dirname, '..', 'wasm', file),
-    });
+    const SQL = await getSqlJs();
 
     if (fsSync.existsSync(this.dbPath)) {
       const buffer = await fs.readFile(this.dbPath);

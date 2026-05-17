@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { watch } from 'vue'
 import { usePapersStore } from './papers'
 import { useConferencePapersStore } from './conference-papers'
 import { useProgressStore } from './progress'
@@ -58,27 +59,31 @@ export const useSummaryQueueStore = defineStore('summaryQueue', () => {
     progressStore.progressTotal = done + remaining
   }
 
-  function startProcessing(): void {
-    progressStore.isAnalyzing = true
-    progressStore.progressPhase = '正在生成论文总结...'
-    progressStore.lastError = ''
-    queue.processQueue().finally(() => {
+  // Set progress state before base enqueue auto-starts processQueue
+  const originalEnqueue = queue.enqueue.bind(queue)
+  function enqueue(items: QueueItem[]): number {
+    if (!queue.isRunning.value) {
+      progressStore.isAnalyzing = true
+      progressStore.progressPhase = '正在生成论文总结...'
+      progressStore.lastError = ''
+    }
+    const added = originalEnqueue(items)
+    if (added === 0 && !queue.isRunning.value) {
+      progressStore.isAnalyzing = false
+      progressStore.progressPhase = ''
+    }
+    return added
+  }
+
+  // Clean up progress state when queue finishes
+  watch(queue.isRunning, (running) => {
+    if (!running && progressStore.isAnalyzing) {
       progressStore.isAnalyzing = false
       progressStore.progressPhase = ''
       progressStore.currentPaper = ''
       progressStore.lastError = ''
-    })
-  }
-
-  // Override enqueue to start processing
-  const originalEnqueue = queue.enqueue.bind(queue)
-  function enqueue(items: QueueItem[]): number {
-    const added = originalEnqueue(items)
-    if (added > 0 && !queue.isRunning.value) {
-      startProcessing()
     }
-    return added
-  }
+  })
 
   return {
     queue: queue.queue,

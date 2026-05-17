@@ -1,11 +1,21 @@
 import initSqlJs from 'sql.js';
-import type { Database as SqlJsDatabase } from 'sql.js';
+import type { Database as SqlJsDatabase, SqlJsStatic } from 'sql.js';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { join, dirname } from 'path';
 
 // __dirname at runtime = dist/main/database/, project root = two levels up
 const MIGRATIONS_DIR = join(__dirname, 'migrations');
+const WASM_DIR = join(__dirname, '..', 'wasm');
+
+// Singleton cache — initSqlJs loads and compiles WASM; do it once
+let sqlJsPromise: Promise<SqlJsStatic> | null = null;
+export function getSqlJs(): Promise<SqlJsStatic> {
+  if (!sqlJsPromise) {
+    sqlJsPromise = initSqlJs({ locateFile: (file: string) => join(WASM_DIR, file) });
+  }
+  return sqlJsPromise;
+}
 
 export const ARXIV_MIGRATIONS = [
   { name: '001_initial', filename: '001_initial.sql' },
@@ -32,9 +42,7 @@ export class Database {
     await fs.mkdir(dir, { recursive: true });
 
     // Initialize sql.js with explicit WASM path
-    const SQL = await initSqlJs({
-      locateFile: (file: string) => join(__dirname, '..', 'wasm', file),
-    });
+    const SQL = await getSqlJs();
 
     // Load existing database from disk, or create a new in-memory one
     if (fsSync.existsSync(this.dbPath)) {
@@ -140,11 +148,9 @@ export class Database {
    * Create a read-only Database from an existing file.
    * Skips migrations and save — used for bundled data like conference papers.
    */
-  static async fromReadOnlyFile(dbPath: string, wasmDir: string): Promise<Database> {
+  static async fromReadOnlyFile(dbPath: string, _wasmDir: string): Promise<Database> {
     const instance = new Database(dbPath);
-    const SQL = await initSqlJs({
-      locateFile: (file: string) => join(wasmDir, file),
-    });
+    const SQL = await getSqlJs();
     const buffer = await fs.readFile(dbPath);
     instance.db = new SQL.Database(buffer);
     return instance;
