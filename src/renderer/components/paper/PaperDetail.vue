@@ -343,9 +343,9 @@ const loadCollectionsIfNeeded = async () => {
     } catch (err) {
       collections.value = []
       const msg = extractErrorMessage(err)
-      if (msg.includes('未配置')) {
-        zoteroError.value = '请先在设置中配置 Zotero'
-        toastStore.show('未配置', '请先在设置中配置 Zotero', 'error')
+      if (msg.includes('未运行')) {
+        zoteroError.value = 'Zotero 未运行'
+        toastStore.show('Zotero 未运行', '请先启动 Zotero 桌面应用', 'error')
       } else {
         zoteroError.value = 'Zotero 连接失败'
         toastStore.show('连接失败', '无法访问 Zotero', 'error', msg)
@@ -363,12 +363,20 @@ const doExportToZotero = async (collectionKey: string) => {
   try {
     const summaryHtml = summaryContent.value ? renderMarkdownOnly(summaryContent.value) : undefined
     const analysisHtml = analysisContent.value ? renderMarkdownOnly(analysisContent.value) : undefined
+    let result: { success: boolean; collectionMoved?: boolean; pdfAttached?: boolean }
     if (isConference.value) {
-      await conferenceExportToZotero(props.paper.id, collectionKey, summaryHtml, analysisHtml)
+      result = await conferenceExportToZotero(props.paper.id, collectionKey, summaryHtml, analysisHtml)
     } else {
-      await exportPaperToZotero(props.paper.id, collectionKey, summaryHtml, analysisHtml)
+      result = await exportPaperToZotero(props.paper.id, collectionKey, summaryHtml, analysisHtml)
     }
-    toastStore.show('导出成功', '已成功导出到 Zotero', 'success')
+    const warnings: string[] = []
+    if (!result.collectionMoved) warnings.push('未移入目标 collection')
+    if (!result.pdfAttached) warnings.push('PDF 附件上传失败')
+    if (warnings.length > 0) {
+      toastStore.show('导出成功', `条目已导出到 Zotero，但${warnings.join('，')}`, 'success')
+    } else {
+      toastStore.show('导出成功', '条目和 PDF 已导出到 Zotero', 'success')
+    }
   } catch (err) {
     console.error('Failed to export to Zotero:', err)
     toastStore.show('导出失败', '导出到 Zotero 失败', 'error', extractErrorMessage(err))

@@ -18,7 +18,6 @@ declare global {
   type Category = T.Category
   type LLMConfig = T.LLMConfig
   type OutputConfig = T.OutputConfig
-  type ZoteroConfig = T.ZoteroConfig
 
   interface Window {
     api: T.ElectronAPI

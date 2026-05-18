@@ -4,234 +4,281 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { fetchCollections, createItem, createChildItems } from '../zotero-client.js';
+// Mock fs/promises for connectorSaveAttachment
+vi.mock('fs/promises', () => ({
+  readFile: vi.fn().mockResolvedValue(Buffer.from('fake-pdf')),
+}));
 
-describe('fetchCollections', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
+// Mock PDF downloader
+vi.mock('../pdf-extractor.js', () => ({
+  ensurePdfDownloaded: vi.fn(),
+}));
+
+import {
+  pingZotero,
+  getConnectorCollections,
+  connectorSaveItems,
+  connectorUpdateSession,
+  connectorSaveAttachment,
+  parseCreators,
+  buildNotes,
+  exportToZotero,
+  type ConnectorItem,
+} from '../zotero-client.js';
+import { ensurePdfDownloaded } from '../pdf-extractor.js';
+
+const mockedDownload = vi.mocked(ensurePdfDownloaded);
+
+// ── Connector API ──
+
+describe('pingZotero', () => {
+  beforeEach(() => { mockFetch.mockReset(); });
+
+  it('returns true when Zotero is running', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    expect(await pingZotero()).toBe(true);
   });
 
-  it('fetches and maps collections', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => [
-        { key: 'ABC123', data: { name: 'My Collection' }, meta: { numItems: 5 } },
-      ],
-    });
-
-    const result = await fetchCollections('12345', 'test-key');
-    expect(result).toHaveLength(1);
-    expect(result[0].key).toBe('ABC123');
-    expect(result[0].name).toBe('My Collection');
-    expect(result[0].numItems).toBe(5);
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.zotero.org/users/12345/collections?limit=100',
-      expect.objectContaining({ headers: { 'Zotero-API-Key': 'test-key' } }),
-    );
+  it('returns false when Zotero is not running', async () => {
+    mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
+    expect(await pingZotero()).toBe(false);
   });
 
-  it('handles 403 error', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 403,
-      text: async () => 'Forbidden',
-    });
-
-    await expect(fetchCollections('12345', 'bad-key')).rejects.toThrow('API Key 无权限');
-  });
-
-  it('handles 404 error', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      text: async () => 'Not Found',
-    });
-
-    await expect(fetchCollections('99999', 'key')).rejects.toThrow('用户不存在');
-  });
-
-  it('handles other HTTP errors', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => 'Server Error',
-    });
-
-    await expect(fetchCollections('12345', 'key')).rejects.toThrow('HTTP 500');
-  });
-
-  it('handles empty response', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => [],
-    });
-
-    const result = await fetchCollections('12345', 'test-key');
-    expect(result).toEqual([]);
-  });
-
-  it('handles null response', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => null,
-    });
-
-    const result = await fetchCollections('12345', 'test-key');
-    expect(result).toEqual([]);
-  });
-
-  it('defaults numItems to 0 when meta is missing', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => [
-        { key: 'K1', data: { name: 'No Meta' } },
-      ],
-    });
-
-    const result = await fetchCollections('12345', 'test-key');
-    expect(result[0].numItems).toBe(0);
-  });
-
-  it('defaults name to empty string when data.name is missing', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => [
-        { key: 'K1', data: {}, meta: { numItems: 0 } },
-      ],
-    });
-
-    const result = await fetchCollections('12345', 'test-key');
-    expect(result[0].name).toBe('');
+  it('returns false on non-200 response', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500 });
+    expect(await pingZotero()).toBe(false);
   });
 });
 
-describe('createItem', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-  });
+describe('getConnectorCollections', () => {
+  beforeEach(() => { mockFetch.mockReset(); });
 
-  it('creates item and returns key', async () => {
+  it('fetches and filters collection targets', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        successful: { '0': 'NEWKEY123' },
-        success: { '0': 'NEWKEY123' },
-        failed: {},
+        targets: [
+          { id: 'L1', name: 'My Library', level: 0 },
+          { id: 'C21', name: 'Inbox', level: 1 },
+          { id: 'C6', name: '2D Computer Vision', level: 1 },
+        ],
       }),
     });
 
-    const payload = {
-      itemType: 'journalArticle',
-      title: 'Test Paper',
-      abstractNote: 'Abstract',
-      date: '2024',
-      url: 'https://arxiv.org/abs/2401.00001',
-      extra: '',
-      repository: 'arXiv',
-      archiveID: '2401.00001',
-      creators: [{ creatorType: 'author', firstName: 'John', lastName: 'Doe' }],
-      tags: [{ tag: 'AI' }],
-      collections: [],
-    };
+    const result = await getConnectorCollections();
+    expect(result).toHaveLength(2);
+    expect(result[0].key).toBe('C21');
+    expect(result[1].key).toBe('C6');
+  });
 
-    const key = await createItem('12345', 'api-key', 'COLL1', payload);
-    expect(key).toBe('NEWKEY123');
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.zotero.org/users/12345/items',
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          'Zotero-API-Key': 'api-key',
-          'Content-Type': 'application/json',
-        },
-      }),
-    );
-
-    // Verify collectionKey was added
-    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(callBody[0].collections).toEqual(['COLL1']);
+  it('returns empty array when no collections', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ targets: [{ id: 'L1', name: 'My Library' }] }),
+    });
+    expect(await getConnectorCollections()).toEqual([]);
   });
 
   it('throws on HTTP error', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 403,
-      text: async () => 'Forbidden',
-    });
-
-    await expect(createItem('12345', 'bad', 'C1', {} as any)).rejects.toThrow('API Key 无权限');
-  });
-
-  it('throws when no items were successfully created', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        successful: {},
-        failed: { '0': { message: 'Invalid data' } },
-      }),
-    });
-
-    await expect(createItem('12345', 'key', 'C1', {} as any)).rejects.toThrow('条目创建失败');
-  });
-
-  it('handles successful item returned as object', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        successful: { '0': { key: 'OBJKEY' } },
-        success: { '0': { key: 'OBJKEY' } },
-        failed: {},
-      }),
-    });
-
-    const key = await createItem('12345', 'key', 'C1', {} as any);
-    expect(key).toBe('OBJKEY');
+    mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'Error' });
+    await expect(getConnectorCollections()).rejects.toThrow('HTTP 500');
   });
 });
 
-describe('createChildItems', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-  });
+describe('connectorSaveItems', () => {
+  beforeEach(() => { mockFetch.mockReset(); });
 
-  it('creates child items', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        successful: { '0': 'CHILD1', '1': 'CHILD2' },
-        success: { '0': 'CHILD1', '1': 'CHILD2' },
-        failed: {},
-      }),
-    });
-
-    const children = [
-      { itemType: 'attachment', parentItem: 'P1', linkMode: 'imported_file', title: 'PDF' },
-      { itemType: 'note', parentItem: 'P1', note: '<p>Notes</p>' },
-    ];
-
-    await createChildItems('12345', 'key', children as any);
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.zotero.org/users/12345/items',
-      expect.objectContaining({ method: 'POST' }),
-    );
-  });
-
-  it('skips when children array is empty', async () => {
-    await createChildItems('12345', 'key', []);
-    expect(mockFetch).not.toHaveBeenCalled();
+  it('sends saveItems request', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    await connectorSaveItems('sess', 'https://arxiv.org/abs/2401', [{
+      id: 'item_0', itemType: 'preprint', title: 'Test', creators: [],
+      tags: [], notes: [], attachments: [], seeAlso: [],
+    }]);
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.sessionID).toBe('sess');
+    expect(body.singleFile).toBe(false);
   });
 
   it('throws on HTTP error', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      text: async () => 'Not Found',
-    });
+    mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'Error' });
+    await expect(connectorSaveItems('s', 'u', [{
+      id: 'i', itemType: 'preprint', title: 'T', creators: [],
+      tags: [], notes: [], attachments: [], seeAlso: [],
+    }])).rejects.toThrow('HTTP 500');
+  });
+});
+
+describe('connectorUpdateSession', () => {
+  beforeEach(() => { mockFetch.mockReset(); });
+
+  it('sends target as string', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    await connectorUpdateSession('sess', 'C21');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.target).toBe('C21');
+  });
+
+  it('throws on HTTP error', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'ERR' });
+    await expect(connectorUpdateSession('bad', 'C21')).rejects.toThrow('HTTP 400');
+  });
+});
+
+describe('connectorSaveAttachment', () => {
+  beforeEach(() => { mockFetch.mockReset(); });
+
+  it('sends PDF data with X-Metadata', async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    await connectorSaveAttachment('s', 'item_0', '/p.pdf', 'PDF', 'url');
+    const metadata = JSON.parse(mockFetch.mock.calls[0][1].headers['X-Metadata']);
+    expect(metadata.parentItemID).toBe('item_0');
+  });
+
+  it('throws on HTTP error', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'ERR' });
+    await expect(connectorSaveAttachment('s', 'i', '/p.pdf', 'PDF', 'url')).rejects.toThrow('HTTP 400');
+  });
+});
+
+// ── Export helpers ──
+
+describe('parseCreators', () => {
+  it('parses single name as lastName only', () => {
+    expect(parseCreators(['Einstein'])).toEqual([
+      { creatorType: 'author', firstName: '', lastName: 'Einstein' },
+    ]);
+  });
+
+  it('parses two-part name', () => {
+    expect(parseCreators(['Alan Turing'])).toEqual([
+      { creatorType: 'author', firstName: 'Alan', lastName: 'Turing' },
+    ]);
+  });
+
+  it('parses multi-part name', () => {
+    expect(parseCreators(['John von Neumann'])).toEqual([
+      { creatorType: 'author', firstName: 'John von', lastName: 'Neumann' },
+    ]);
+  });
+
+  it('handles empty array', () => {
+    expect(parseCreators([])).toEqual([]);
+  });
+
+  it('handles multiple authors', () => {
+    const result = parseCreators(['Ada Lovelace', 'Alan Turing']);
+    expect(result).toHaveLength(2);
+    expect(result[0].lastName).toBe('Lovelace');
+    expect(result[1].lastName).toBe('Turing');
+  });
+});
+
+describe('buildNotes', () => {
+  it('returns empty array when no content', () => {
+    expect(buildNotes()).toEqual([]);
+  });
+
+  it('builds summary note', () => {
+    expect(buildNotes('<p>Summary</p>')).toEqual([
+      '<h1>论文总结</h1><p>Summary</p>',
+    ]);
+  });
+
+  it('builds both notes', () => {
+    expect(buildNotes('<p>S</p>', '<p>A</p>')).toEqual([
+      '<h1>论文总结</h1><p>S</p>',
+      '<h1>论文分析</h1><p>A</p>',
+    ]);
+  });
+});
+
+describe('exportToZotero', () => {
+  const baseItem: ConnectorItem = {
+    id: 'item_0', itemType: 'preprint', title: 'Test',
+    url: 'https://arxiv.org/abs/2401', creators: [],
+    tags: [], notes: [], attachments: [], seeAlso: [],
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockedDownload.mockReset();
+  });
+
+  it('returns full success when all steps succeed', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true });
+    mockedDownload.mockResolvedValue('/tmp/paper.pdf');
+
+    const result = await exportToZotero(
+      baseItem, 'https://arxiv.org/pdf/2401', 'arXiv', '2401', 'C21', '/data',
+    );
+
+    expect(result).toEqual({ success: true, collectionMoved: true, pdfAttached: true });
+    expect(mockedDownload).toHaveBeenCalledWith(
+      'https://arxiv.org/pdf/2401', undefined, '/data', 'arXiv', '2401',
+    );
+  });
+
+  it('returns collectionMoved=false when updateSession fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'err' })
+      .mockResolvedValueOnce({ ok: true });
+    mockedDownload.mockResolvedValue('/tmp/paper.pdf');
+
+    const result = await exportToZotero(
+      baseItem, 'https://arxiv.org/pdf/2401', 'arXiv', '2401', 'C21', '/data',
+    );
+
+    expect(result).toEqual({ success: true, collectionMoved: false, pdfAttached: true });
+  });
+
+  it('returns pdfAttached=false when PDF download fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true });
+    mockedDownload.mockRejectedValue(new Error('network error'));
+
+    const result = await exportToZotero(
+      baseItem, 'https://arxiv.org/pdf/2401', 'arXiv', '2401', 'C21', '/data',
+    );
+
+    expect(result).toEqual({ success: true, collectionMoved: true, pdfAttached: false });
+  });
+
+  it('returns pdfAttached=false when saveAttachment fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'err' });
+    mockedDownload.mockResolvedValue('/tmp/paper.pdf');
+
+    const result = await exportToZotero(
+      baseItem, 'https://arxiv.org/pdf/2401', 'arXiv', '2401', 'C21', '/data',
+    );
+
+    expect(result).toEqual({ success: true, collectionMoved: true, pdfAttached: false });
+  });
+
+  it('skips PDF when no pdfUrl', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true });
+
+    const result = await exportToZotero(baseItem, '', 'arXiv', '2401', 'C21', '/data');
+
+    expect(result).toEqual({ success: true, collectionMoved: true, pdfAttached: false });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockedDownload).not.toHaveBeenCalled();
+  });
+
+  it('throws when saveItems fails', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'err' });
 
     await expect(
-      createChildItems('12345', 'key', [{ itemType: 'note', parentItem: 'P1' }] as any),
-    ).rejects.toThrow('用户不存在');
+      exportToZotero(baseItem, '', 'arXiv', '2401', 'C21', '/data'),
+    ).rejects.toThrow('saveItems');
   });
 });

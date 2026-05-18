@@ -82,14 +82,12 @@ describe('useConfigStore', () => {
       mockedGetConfig.mockResolvedValue({
         llm: { api_key: 'sk-test', base_url: 'https://api.test.com', model: 'gpt-4', temperature: 0.7 },
         output: { output_dir: '/tmp', auto_save: true },
-        zotero: { api_key: 'z-key', user_id: '123' },
         theme: 'dark',
       });
       const store = useConfigStore();
       await store.loadConfig();
       expect(store.llmConfig.api_key).toBe('sk-test');
       expect(store.llmConfig.temperature).toBe(0.7);
-      expect(store.zoteroConfig.api_key).toBe('z-key');
       expect(store.theme).toBe('dark');
     });
   });

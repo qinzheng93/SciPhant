@@ -4,18 +4,13 @@ import { mkdir, readFile, access, open, rename, unlink } from 'fs/promises';
 import { join } from 'path';
 import { classifyDirectNetworkError } from './net-fetch.js';
 
-function getPdfDir(dataDir?: string): string {
-  return dataDir ? join(dataDir, 'pdfs') : join(process.cwd(), 'pdfs');
+function getPdfDir(dataDir: string, category: string): string {
+  return join(dataDir, 'pdfs', category);
 }
 
-function sanitizeFileName(url: string): string {
-  const rawName = decodeURIComponent(url.split('/').pop() || 'paper.pdf');
-  const sanitized = rawName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  return sanitized.endsWith('.pdf') ? sanitized : `${sanitized}.pdf`;
-}
-
-export function getPdfPath(dataDir: string, url: string): string {
-  return join(getPdfDir(dataDir), sanitizeFileName(url));
+export function getPdfPath(dataDir: string, category: string, paperId: string): string {
+  const fileName = paperId.endsWith('.pdf') ? paperId : `${paperId}.pdf`;
+  return join(getPdfDir(dataDir, category), fileName);
 }
 
 function wrapDownloadError(e: unknown): Error {
@@ -74,10 +69,12 @@ export async function ensurePdfDownloaded(
   url: string,
   signal?: AbortSignal,
   dataDir?: string,
+  category?: string,
+  paperId?: string,
   onProgress?: (loaded: number, total?: number) => void,
 ): Promise<string> {
-  const pdfDir = getPdfDir(dataDir);
-  const fileName = sanitizeFileName(url);
+  const pdfDir = getPdfDir(dataDir!, category!);
+  const fileName = paperId!.endsWith('.pdf') ? paperId! : `${paperId!}.pdf`;
   const filePath = join(pdfDir, fileName);
 
   // Check if already cached
@@ -101,10 +98,12 @@ export async function extractTextFromUrl(
   url: string,
   signal?: AbortSignal,
   dataDir?: string,
+  category?: string,
+  paperId?: string,
   onProgress?: (phase: string) => void,
 ): Promise<string> {
   onProgress?.('下载中');
-  const filePath = await ensurePdfDownloaded(url, signal, dataDir);
+  const filePath = await ensurePdfDownloaded(url, signal, dataDir, category, paperId);
   onProgress?.('解析中');
 
   try {

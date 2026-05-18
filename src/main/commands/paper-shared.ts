@@ -75,7 +75,7 @@ export async function analyzeFullPaperCore(
     throw new Error(`Paper ${paperId} has no PDF URL`);
   }
 
-  const fullText = await extractTextFromUrl(pdfUrl, signal, dataDir, onProgress);
+  const fullText = await extractTextFromUrl(pdfUrl, signal, dataDir, category, paperId, onProgress);
 
   if (!fullText.trim()) {
     throw new Error('Failed to extract text from PDF');

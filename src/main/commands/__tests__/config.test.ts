@@ -3,7 +3,6 @@ import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
 import {
   loadLLMConfig,
-  loadZoteroConfig,
   listTopics,
   saveTopic,
   deleteTopic,
@@ -157,22 +156,6 @@ describe('config commands', () => {
     });
   });
 
-  describe('loadZoteroConfig', () => {
-    it('returns defaults when no config exists', () => {
-      const config = loadZoteroConfig(settingsDb);
-      expect(config.api_key).toBe('');
-      expect(config.user_id).toBe('');
-    });
-
-    it('loads saved Zotero config', () => {
-      settingsDb.run("INSERT INTO app_config VALUES ('zotero.api_key', 'key-123')");
-      settingsDb.run("INSERT INTO app_config VALUES ('zotero.user_id', '456')");
-      const config = loadZoteroConfig(settingsDb);
-      expect(config.api_key).toBe('key-123');
-      expect(config.user_id).toBe('456');
-    });
-  });
-
   describe('topics', () => {
     it('lists empty topics', () => {
       expect(listTopics(topicsDb)).toEqual([]);
@@ -261,8 +244,6 @@ describe('config commands', () => {
       expect(config.llm.api_key).toBe('');
       expect(config.output.output_dir).toBe('');
       expect(config.output.auto_save).toBe(false);
-      expect(config.zotero).toBeDefined();
-      expect(config.zotero!.api_key).toBe('');
       expect(config.theme).toBeUndefined();
     });
 
@@ -271,7 +252,6 @@ describe('config commands', () => {
         settingsDb,
         { api_key: 'sk-1', base_url: 'https://api.test.com', model: 'test', temperature: 0.7 },
         { output_dir: '/tmp/out', auto_save: true },
-        { api_key: 'z-key', user_id: '123' },
         'dark',
       );
       const config = getConfig(settingsDb);
@@ -279,8 +259,6 @@ describe('config commands', () => {
       expect(config.llm.temperature).toBe(0.7);
       expect(config.output.output_dir).toBe('/tmp/out');
       expect(config.output.auto_save).toBe(true);
-      expect(config.zotero!.api_key).toBe('z-key');
-      expect(config.zotero!.user_id).toBe('123');
       expect(config.theme).toBe('dark');
     });
 
@@ -289,14 +267,12 @@ describe('config commands', () => {
         settingsDb,
         { api_key: 'sk-1', base_url: '', model: '', temperature: 1.0 },
         { output_dir: '', auto_save: false },
-        undefined,
         'light',
       );
       updateConfig(
         settingsDb,
         { api_key: 'sk-2', base_url: 'https://new.com', model: 'gpt-4', temperature: 0.5 },
         { output_dir: '', auto_save: false },
-        undefined,
         undefined,
       );
       const config = getConfig(settingsDb);

@@ -13,7 +13,6 @@
       <CategoryEditor />
       <TopicEditor />
       <LLMSettings />
-      <ZoteroSettings />
 
       <div class="danger-zone">
         <h3 class="danger-title">危险操作</h3>
@@ -46,7 +45,6 @@ import { ChevronLeft } from 'lucide-vue-next'
 import TopicEditor from '../components/config/TopicEditor.vue'
 import CategoryEditor from '../components/config/CategoryEditor.vue'
 import LLMSettings from '../components/config/LLMSettings.vue'
-import ZoteroSettings from '../components/config/ZoteroSettings.vue'
 import GeneralSettings from '../components/config/GeneralSettings.vue'
 import { usePapersStore } from '../stores/papers'
 import { useToastStore } from '../stores/toast'

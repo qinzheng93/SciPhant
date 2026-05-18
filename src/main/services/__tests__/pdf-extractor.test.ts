@@ -57,9 +57,9 @@ describe('pdf-extractor', () => {
     const content = new TextEncoder().encode('%PDF complete');
     mockedFetch.mockResolvedValue(responseFromChunks([content]));
 
-    const filePath = await ensurePdfDownloaded(url, undefined, dataDir);
+    const filePath = await ensurePdfDownloaded(url, undefined, dataDir, 'arXiv', '2401.12345');
 
-    expect(filePath).toBe(getPdfPath(dataDir, url));
+    expect(filePath).toBe(getPdfPath(dataDir, 'arXiv', '2401.12345'));
     await expect(readFile(filePath, 'utf-8')).resolves.toBe('%PDF complete');
     await expect(pathExists(`${filePath}.tmp`)).resolves.toBe(false);
   });
@@ -69,10 +69,37 @@ describe('pdf-extractor', () => {
     const partialContent = new TextEncoder().encode('%PDF partial');
     mockedFetch.mockResolvedValue(responseFromChunks([partialContent], true));
 
-    const filePath = getPdfPath(dataDir, url);
+    const filePath = getPdfPath(dataDir, 'arXiv', '2401.67890');
 
-    await expect(ensurePdfDownloaded(url, undefined, dataDir)).rejects.toThrow('stream failed');
+    await expect(ensurePdfDownloaded(url, undefined, dataDir, 'arXiv', '2401.67890')).rejects.toThrow('stream failed');
     await expect(pathExists(filePath)).resolves.toBe(false);
     await expect(pathExists(`${filePath}.tmp`)).resolves.toBe(false);
+  });
+
+  it('stores PDFs in category subdirectory', async () => {
+    const url = 'https://example.com/paper.pdf';
+    const content = new TextEncoder().encode('%PDF conf');
+    mockedFetch.mockResolvedValue(responseFromChunks([content]));
+
+    const filePath = await ensurePdfDownloaded(url, undefined, dataDir, 'CVPR2025', 'CVPR-2025-0001');
+
+    expect(filePath).toBe(join(dataDir, 'pdfs', 'CVPR2025', 'CVPR-2025-0001.pdf'));
+    await expect(readFile(filePath, 'utf-8')).resolves.toBe('%PDF conf');
+  });
+
+  it('returns cached file without re-downloading', async () => {
+    const url = 'https://arxiv.org/pdf/2401.12345.pdf';
+    const content = new TextEncoder().encode('%PDF cached');
+    mockedFetch.mockResolvedValue(responseFromChunks([content]));
+
+    // First download
+    const path1 = await ensurePdfDownloaded(url, undefined, dataDir, 'arXiv', '2401.12345');
+
+    // Second call should not trigger another fetch
+    mockedFetch.mockClear();
+    const path2 = await ensurePdfDownloaded(url, undefined, dataDir, 'arXiv', '2401.12345');
+
+    expect(path1).toBe(path2);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

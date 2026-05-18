@@ -36,7 +36,6 @@ const api: ElectronAPI = {
   summarizeArxivPaper: (id, skipIfAnalyzed) => ipcRenderer.invoke('arxiv:summarize-paper', id, skipIfAnalyzed),
   stopArxivSummary: () => ipcRenderer.invoke('arxiv:stop-summary'),
   testLLMConnection: () => ipcRenderer.invoke('test-llm-connection'),
-  testZoteroConnection: () => ipcRenderer.invoke('test-zotero-connection'),
 
   // PDF download (arXiv)
   downloadArxivPdf: (id) => ipcRenderer.invoke('arxiv:download-pdf', id),

@@ -60,14 +60,13 @@ export const rebuildPaperTopics = async (): Promise<{ success: boolean; count: n
   return window.api.rebuildPaperTopics()
 }
 
-export const getConfig = async (): Promise<{ llm: LLMConfig; output: OutputConfig; zotero?: ZoteroConfig; theme?: string }> => {
+export const getConfig = async (): Promise<{ llm: LLMConfig; output: OutputConfig; theme?: string }> => {
   return window.api.getConfig()
 }
 
 export const updateConfig = async (config: {
   llm: LLMConfig
   output: OutputConfig
-  zotero?: ZoteroConfig
   theme?: string
 }): Promise<void> => {
   return window.api.updateConfig(config)
@@ -76,12 +75,6 @@ export const updateConfig = async (config: {
 // Fetch dates API
 export const listArxivFetchDates = async (): Promise<FetchDate[]> => {
   return window.api.listArxivFetchDates()
-}
-
-export interface TopicCount {
-  topic_id: number
-  name: string
-  count: number
 }
 
 // Category API
@@ -172,10 +165,6 @@ export const testLLMConnection = async (): Promise<{ success: boolean; message: 
   return window.api.testLLMConnection()
 }
 
-export const testZoteroConnection = async (): Promise<{ success: boolean; message: string }> => {
-  return window.api.testZoteroConnection()
-}
-
 // Analysis API (full paper)
 export const analyzeArxivFullPaper = async (paperId: string): Promise<{ success: boolean; cancelled?: boolean }> => {
   return window.api.analyzeArxivFullPaper(paperId)
@@ -221,7 +210,7 @@ export const listZoteroCollections = async (): Promise<ZoteroCollection[]> => {
   return window.api.listZoteroCollections()
 }
 
-export const exportPaperToZotero = async (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string): Promise<{ success: boolean; itemKey: string }> => {
+export const exportPaperToZotero = async (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string): Promise<{ success: boolean; collectionMoved?: boolean; pdfAttached?: boolean }> => {
   return window.api.exportPaperToZotero(paperId, collectionKey, summaryHtml, analysisHtml)
 }
 
@@ -304,7 +293,7 @@ export const conferenceDeleteAnalysis = async (paperId: string): Promise<void> =
   return window.api.conferenceDeleteAnalysis(paperId)
 }
 
-export const conferenceExportToZotero = async (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string): Promise<{ success: boolean; itemKey: string }> => {
+export const conferenceExportToZotero = async (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string): Promise<{ success: boolean; collectionMoved?: boolean; pdfAttached?: boolean }> => {
   return window.api.conferenceExportToZotero(paperId, collectionKey, summaryHtml, analysisHtml)
 }
 

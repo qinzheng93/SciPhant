@@ -1,12 +1,10 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import { app } from 'electron';
-import type { Topic, LLMConfig, OutputConfig, ZoteroConfig, Category } from '../../shared/ipc-api.js';
-import { fetchCollections } from '../services/zotero-client.js';
+import type { Topic, LLMConfig, OutputConfig, Category } from '../../shared/ipc-api.js';
 
 export interface ConfigResponse {
   llm: LLMConfig;
   output: OutputConfig;
-  zotero?: ZoteroConfig;
   theme?: string;
 }
 
@@ -43,24 +41,6 @@ export function loadLLMConfig(settingsDb: SqlJsDatabase): LLMConfig {
         break;
       }
     }
-  }
-  return config;
-}
-
-/**
- * Load Zotero config from settings db app_config table.
- */
-export function loadZoteroConfig(settingsDb: SqlJsDatabase): ZoteroConfig {
-  const config: ZoteroConfig = { api_key: '', user_id: '' };
-
-  const rows = settingsDb.exec("SELECT key, value FROM app_config WHERE key LIKE 'zotero.%'");
-  if (rows.length === 0) return config;
-
-  for (const row of rows[0].values) {
-    const key = row[0] as string;
-    const value = row[1] as string;
-    if (key === 'zotero.api_key') config.api_key = value;
-    if (key === 'zotero.user_id') config.user_id = value;
   }
   return config;
 }
@@ -144,7 +124,6 @@ export function getConfig(settingsDb: SqlJsDatabase): ConfigResponse {
     output_dir: '',
     auto_save: false,
   };
-  const zoteroConfig = loadZoteroConfig(settingsDb);
   let theme: string | undefined;
 
   const configRows = settingsDb.exec("SELECT key, value FROM app_config WHERE key LIKE 'output.%' OR key = 'theme'");
@@ -166,13 +145,13 @@ export function getConfig(settingsDb: SqlJsDatabase): ConfigResponse {
     }
   }
 
-  return { llm: llmConfig, output: outputConfig, zotero: zoteroConfig, theme };
+  return { llm: llmConfig, output: outputConfig, theme };
 }
 
 /**
  * Update application config (LLM + output + theme).
  */
-export function updateConfig(settingsDb: SqlJsDatabase, llm: LLMConfig, output: OutputConfig, zotero?: ZoteroConfig, theme?: string): void {
+export function updateConfig(settingsDb: SqlJsDatabase, llm: LLMConfig, output: OutputConfig, theme?: string): void {
   // Save LLM config
   settingsDb.run(
     `INSERT INTO app_config (key, value) VALUES ('llm.api_key', ?)
@@ -206,20 +185,6 @@ export function updateConfig(settingsDb: SqlJsDatabase, llm: LLMConfig, output: 
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     [String(output.auto_save)],
   );
-
-  // Save Zotero config
-  if (zotero) {
-    settingsDb.run(
-      `INSERT INTO app_config (key, value) VALUES ('zotero.api_key', ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-      [zotero.api_key],
-    );
-    settingsDb.run(
-      `INSERT INTO app_config (key, value) VALUES ('zotero.user_id', ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-      [zotero.user_id],
-    );
-  }
 
   // Save theme
   if (theme) {
@@ -309,21 +274,4 @@ export function clearAllData(
   settingsDb.run('DELETE FROM app_config');
 
   return { success: true };
-}
-
-/**
- * Test Zotero connection by fetching collections.
- */
-export async function testZoteroConnection(settingsDb: SqlJsDatabase): Promise<{ success: boolean; message: string }> {
-  const config = loadZoteroConfig(settingsDb);
-  if (!config.api_key || !config.user_id) {
-    return { success: false, message: 'Zotero API Key 和 User ID 未配置' };
-  }
-  try {
-    const collections = await fetchCollections(config.user_id, config.api_key);
-    return { success: true, message: `连接成功，共 ${collections.length} 个分类` };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, message: msg };
-  }
 }

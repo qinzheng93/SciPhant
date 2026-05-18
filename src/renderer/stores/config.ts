@@ -21,10 +21,6 @@ export const useConfigStore = defineStore('config', () => {
     output_dir: './output',
     auto_save: true,
   })
-  const zoteroConfig = ref<ZoteroConfig>({
-    api_key: '',
-    user_id: '',
-  })
   const theme = ref<'light' | 'dark' | 'system'>('system')
 
   // Rebuild index
@@ -109,13 +105,12 @@ export const useConfigStore = defineStore('config', () => {
     }) as unknown as T
   }
 
-  // Debounced config save (LLM + Zotero + theme)
+  // Debounced config save (LLM + theme)
   const _persistConfig = debounce(async () => {
     try {
       await updateConfig({
         llm: toRaw(llmConfig.value),
         output: toRaw(outputConfig.value),
-        zotero: toRaw(zoteroConfig.value),
         theme: theme.value,
       })
     } catch (err) {
@@ -126,10 +121,9 @@ export const useConfigStore = defineStore('config', () => {
   // Initialize
   const loadConfig = async () => {
     try {
-      const { llm, output, zotero, theme: savedTheme } = await getConfig()
+      const { llm, output, theme: savedTheme } = await getConfig()
       llmConfig.value = llm
       outputConfig.value = output
-      if (zotero) zoteroConfig.value = zotero
       if (savedTheme) theme.value = savedTheme as 'light' | 'dark' | 'system'
     } catch (err) { console.error('Failed to load config:', err) }
   }
@@ -151,14 +145,14 @@ export const useConfigStore = defineStore('config', () => {
   loadConfig().then(() => {
     // Start auto-save watch only after initial load to avoid saving defaults
     watch(
-      [llmConfig, zoteroConfig, theme],
+      [llmConfig, theme],
       () => _persistConfig(),
       { deep: true },
     )
   })
 
   return {
-    topics, categories, llmConfig, outputConfig, zoteroConfig, theme,
+    topics, categories, llmConfig, outputConfig, theme,
     addTopic, updateTopic, deleteTopic,
     addCategory, updateCategory, deleteCategory,
     loadTopics, loadCategories, loadConfig,

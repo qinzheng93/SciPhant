@@ -67,11 +67,6 @@ export interface OutputConfig {
   auto_save: boolean
 }
 
-export interface ZoteroConfig {
-  api_key: string
-  user_id: string
-}
-
 // ── API interface ──
 
 export interface ElectronAPI {
@@ -92,8 +87,8 @@ export interface ElectronAPI {
   saveTopic: (topic: { id?: number; name: string; keywords: string[]; enabled: boolean }) => Promise<Topic | { error: string }>
   deleteTopic: (topicId: number) => Promise<void>
   rebuildPaperTopics: () => Promise<{ success: boolean; count: number }>
-  getConfig: () => Promise<{ llm: LLMConfig; output: OutputConfig; zotero?: ZoteroConfig; theme?: string }>
-  updateConfig: (config: { llm: LLMConfig; output: OutputConfig; zotero?: ZoteroConfig; theme?: string }) => Promise<void>
+  getConfig: () => Promise<{ llm: LLMConfig; output: OutputConfig; theme?: string }>
+  updateConfig: (config: { llm: LLMConfig; output: OutputConfig; theme?: string }) => Promise<void>
   listCategories: () => Promise<Category[]>
   saveCategory: (category: { id?: number; name: string; enabled: boolean }) => Promise<Category>
   deleteCategory: (categoryId: number) => Promise<void>
@@ -127,7 +122,6 @@ export interface ElectronAPI {
   summarizeArxivPaper: (paperId: string, skipIfAnalyzed?: boolean) => Promise<{ success: boolean; summary: string | null; skipped?: boolean; cancelled?: boolean }>
   stopArxivSummary: () => Promise<{ success: boolean }>
   testLLMConnection: () => Promise<{ success: boolean; message: string }>
-  testZoteroConnection: () => Promise<{ success: boolean; message: string }>
 
   // Analysis (full paper)
   analyzeArxivFullPaper: (id: string) => Promise<{ success: boolean; cancelled?: boolean }>
@@ -145,7 +139,7 @@ export interface ElectronAPI {
 
   // Zotero
   listZoteroCollections: () => Promise<{ key: string; name: string; numItems: number }[]>
-  exportPaperToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => Promise<{ success: boolean; itemKey: string }>
+  exportPaperToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => Promise<{ success: boolean; collectionMoved?: boolean; pdfAttached?: boolean }>
 
   // Dialog
   openDirectory: () => Promise<string | undefined>
@@ -177,7 +171,7 @@ export interface ElectronAPI {
   conferenceDeletePdf: (id: string) => Promise<void>
   conferenceDeleteSummary: (id: string) => Promise<void>
   conferenceDeleteAnalysis: (id: string) => Promise<void>
-  conferenceExportToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => Promise<{ success: boolean; itemKey: string }>
+  conferenceExportToZotero: (paperId: string, collectionKey: string, summaryHtml?: string, analysisHtml?: string) => Promise<{ success: boolean; collectionMoved?: boolean; pdfAttached?: boolean }>
 
   // Conference import
   conferenceReadImportFile: () => Promise<ReadImportResult | null>

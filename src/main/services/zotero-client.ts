@@ -1,4 +1,7 @@
-const ZOTERO_API_BASE = 'https://api.zotero.org';
+import { readFile } from 'fs/promises';
+import { ensurePdfDownloaded } from './pdf-extractor.js';
+
+const CONNECTOR_BASE = 'http://127.0.0.1:23119';
 
 export interface ZoteroCollection {
   key: string;
@@ -6,120 +9,169 @@ export interface ZoteroCollection {
   numItems: number;
 }
 
-/**
- * Fetch collections from a Zotero library.
- */
-export async function fetchCollections(
-  userId: string,
-  apiKey: string,
-): Promise<ZoteroCollection[]> {
-  const url = `${ZOTERO_API_BASE}/users/${userId}/collections?limit=100`;
-  const res = await fetch(url, {
-    headers: { 'Zotero-API-Key': apiKey },
-  });
-  if (!res.ok) {
-    const hint = res.status === 403 ? 'API Key 无权限 (HTTP 403)'
-      : res.status === 404 ? '用户不存在 (HTTP 404)'
-      : `HTTP ${res.status}`;
-    throw new Error(`Zotero ${hint}: ${await res.text().catch(() => '')}`);
+// ── Connector API ──
+
+const CONNECTOR_HEADERS: Record<string, string> = {
+  'Content-Type': 'application/json',
+  'X-Zotero-Connector-API-Version': '3',
+};
+
+class ConnectorError extends Error {
+  constructor(endpoint: string, status: number, body: string) {
+    super(`Zotero ${endpoint} 失败: HTTP ${status} ${body}`);
   }
-  const data = await res.json();
-  return (data || []).map((c: any) => ({
-    key: c.key,
-    name: c.data?.name || '',
-    numItems: c.meta?.numItems || 0,
-  }));
 }
 
-export interface CreateItemPayload {
+async function connectorFetch(
+  endpoint: string,
+  options?: RequestInit & { headers?: Record<string, string> },
+): Promise<Response> {
+  const res = await fetch(`${CONNECTOR_BASE}/connector${endpoint}`, {
+    ...options,
+    headers: { ...CONNECTOR_HEADERS, ...options?.headers },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new ConnectorError(endpoint.replace(/^\//, ''), res.status, text);
+  }
+  return res;
+}
+
+export async function pingZotero(): Promise<boolean> {
+  try {
+    await connectorFetch('/ping', { method: 'POST', body: JSON.stringify({}) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getConnectorCollections(): Promise<ZoteroCollection[]> {
+  const res = await connectorFetch('/getSelectedCollection', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+  const data = await res.json();
+  const targets: Array<{ id: string; name: string }> = data.targets || [];
+  return targets
+    .filter(t => t.id.startsWith('C'))
+    .map(t => ({ key: t.id, name: t.name, numItems: 0 }));
+}
+
+export interface ConnectorItem {
+  id: string;
   itemType: string;
   title: string;
-  abstractNote: string;
-  date: string;
-  url: string;
-  extra: string;
-  repository: string;
-  archiveID: string;
+  abstractNote?: string;
+  date?: string;
+  url?: string;
+  repository?: string;
+  archiveID?: string;
+  extra?: string;
   proceedingsTitle?: string;
   conferenceName?: string;
   pages?: string;
-  creators: { creatorType: string; firstName: string; lastName: string }[];
-  tags: { tag: string }[];
-  collections: string[];
+  creators: Array<{ creatorType: string; firstName: string; lastName: string }>;
+  tags: Array<{ tag: string }>;
+  notes: Array<{ note: string }>;
+  attachments: never[]; // always empty — handled via saveAttachment
+  seeAlso: never[];
 }
 
-export interface ChildItemPayload {
-  itemType: string;
-  parentItem: string;
-  linkMode?: string;
-  path?: string;
-  title?: string;
-  contentType?: string;
-  note?: string;
-  tags?: { tag: string }[];
+export async function connectorSaveItems(
+  sessionID: string,
+  uri: string,
+  items: ConnectorItem[],
+): Promise<void> {
+  await connectorFetch('/saveItems', {
+    method: 'POST',
+    body: JSON.stringify({ sessionID, uri, items, singleFile: false }),
+  });
 }
 
-/**
- * Create items in Zotero (main item, or child items).
- */
-async function createItems(
-  userId: string,
-  apiKey: string,
-  items: any[],
-): Promise<any[]> {
-  const url = `${ZOTERO_API_BASE}/users/${userId}/items`;
-  const res = await fetch(url, {
+export async function connectorUpdateSession(
+  sessionID: string,
+  target: string,
+  tags: string[] = [],
+): Promise<void> {
+  await connectorFetch('/updateSession', {
+    method: 'POST',
+    body: JSON.stringify({ sessionID, target, tags }),
+  });
+}
+
+export async function connectorSaveAttachment(
+  sessionID: string,
+  parentItemID: string,
+  filePath: string,
+  title: string,
+  url: string,
+): Promise<void> {
+  const fileData = await readFile(filePath);
+  await connectorFetch('/saveAttachment', {
     method: 'POST',
     headers: {
-      'Zotero-API-Key': apiKey,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/pdf',
+      'X-Metadata': JSON.stringify({ sessionID, parentItemID, title, url }),
     },
-    body: JSON.stringify(items),
-  });
-  if (!res.ok) {
-    const hint = res.status === 403 ? 'API Key 无权限 (HTTP 403)'
-      : res.status === 404 ? '用户不存在 (HTTP 404)'
-      : `HTTP ${res.status}`;
-    throw new Error(`Zotero ${hint}: ${await res.text().catch(() => '')}`);
-  }
-  const data = await res.json();
-  const successKeys = Object.keys(data.successful || {});
-  if (successKeys.length === 0) {
-    console.error('[Zotero] API response:', JSON.stringify(data, null, 2));
-    const failedKeys = Object.keys(data.failed || {});
-    const failedMsg = failedKeys.length > 0 ? JSON.stringify(data.failed) : 'unknown';
-    throw new Error(`Zotero 条目创建失败: ${failedMsg}`);
-  }
-  return successKeys.map(idx => {
-    const item = data.success[idx];
-    // Zotero API returns just the key string for successful items
-    return typeof item === 'string' ? { key: item } : item;
+    body: fileData,
   });
 }
 
-/**
- * Create a single item in a Zotero collection.
- */
-export async function createItem(
-  userId: string,
-  apiKey: string,
+// ── Export helpers ──
+
+export function parseCreators(authors: string[]): Array<{ creatorType: 'author'; firstName: string; lastName: string }> {
+  return authors.map(name => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return { creatorType: 'author' as const, firstName: '', lastName: parts[0] };
+    return { creatorType: 'author' as const, firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] };
+  });
+}
+
+export function buildNotes(summaryHtml?: string, analysisHtml?: string): string[] {
+  const parts: string[] = [];
+  if (summaryHtml) parts.push(`<h1>论文总结</h1>${summaryHtml}`);
+  if (analysisHtml) parts.push(`<h1>论文分析</h1>${analysisHtml}`);
+  return parts;
+}
+
+export interface ExportResult {
+  success: boolean;
+  collectionMoved: boolean;
+  pdfAttached: boolean;
+}
+
+export async function exportToZotero(
+  item: ConnectorItem,
+  pdfUrl: string,
+  pdfCategory: string,
+  paperId: string,
   collectionKey: string,
-  item: CreateItemPayload,
-): Promise<string> {
-  const results = await createItems(userId, apiKey, [
-    { ...item, collections: [collectionKey] },
-  ]);
-  return results[0].key;
-}
+  dataDir: string,
+): Promise<ExportResult> {
+  const sessionID = `blueberry-${pdfCategory}-${paperId}-${Date.now()}`;
 
-/**
- * Create child items (attachments, notes) under a parent item.
- */
-export async function createChildItems(
-  userId: string,
-  apiKey: string,
-  children: ChildItemPayload[],
-): Promise<void> {
-  if (children.length === 0) return;
-  await createItems(userId, apiKey, children);
+  await connectorSaveItems(sessionID, item.url || '', [item]);
+
+  let collectionMoved = false;
+  try {
+    await connectorUpdateSession(sessionID, collectionKey);
+    collectionMoved = true;
+  } catch {
+    // Item created but not moved to target collection
+  }
+
+  let pdfAttached = false;
+  if (pdfUrl) {
+    try {
+      const localPath = await ensurePdfDownloaded(pdfUrl, undefined, dataDir, pdfCategory, paperId);
+      await connectorSaveAttachment(sessionID, 'item_0', localPath, 'Full Text PDF', pdfUrl);
+      pdfAttached = true;
+    } catch {
+      // PDF download or upload failed
+    }
+  }
+
+  return { success: true, collectionMoved, pdfAttached };
 }
