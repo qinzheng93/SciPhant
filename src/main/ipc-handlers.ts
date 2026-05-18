@@ -21,7 +21,7 @@ import * as fsSync from 'fs';
 import { getSqlJs } from './database/connection.js';
 import type * as IPC from '../shared/ipc-api.js';
 import { ensurePdfDownloaded, getPdfPath } from './services/pdf-extractor.js';
-import { pingZotero, getConnectorCollections, parseCreators, buildNotes, exportToZotero, type ConnectorItem } from './services/zotero-client.js';
+import { pingZotero, getConnectorCollections, exportToZotero, buildArxivExportItem, buildConferenceExportItem } from './services/zotero-client.js';
 import { saveDataDir, resetDataDir } from './commands/config.js';
 import {
   deleteAnalysisFile,
@@ -29,10 +29,10 @@ import {
 } from './services/analysis-files.js';
 import { checkArxivSummaryStatus, getArxivSummaryContent } from './commands/arxiv-summary.js';
 import {
-  getCategoryForConference,
   checkConferenceSummaryStatus,
   getConferenceSummaryContent,
 } from './commands/conference-summary.js';
+import { getCategoryForConference } from './commands/conference-paper.js';
 
 function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
   ipcMain.handle(channel, async (_event, ...args) => {
@@ -344,31 +344,8 @@ export function registerIpcHandlers(
     if (results.length === 0 || results[0].values.length === 0) {
       throw new Error(`Paper ${paperId} not found`);
     }
-    const row = results[0].values[0];
 
-    const arxivId = (row[0] as string).replace(/v\d+$/, '');
-    const categories: string[] = JSON.parse(row[7] as string);
-    const extraLines: string[] = [];
-    if (categories.length > 0) extraLines.push(`Categories: ${categories.join(', ')}`);
-
-    const item: ConnectorItem = {
-      id: 'item_0',
-      itemType: 'preprint',
-      title: row[1] as string,
-      abstractNote: (row[3] as string) || '',
-      date: (row[6] as string) || '',
-      url: ((row[4] as string) || '').replace(/v\d+$/, ''),
-      repository: 'arXiv',
-      archiveID: `arXiv:${arxivId}`,
-      extra: extraLines.join('\n'),
-      creators: parseCreators(JSON.parse(row[2] as string)),
-      tags: [],
-      notes: buildNotes(summaryHtml, analysisHtml).map(n => ({ note: n })),
-      attachments: [],
-      seeAlso: [],
-    };
-
-    const pdfUrl = (row[5] as string) || '';
+    const { item, pdfUrl } = buildArxivExportItem(results[0].values[0], summaryHtml, analysisHtml);
     return exportToZotero(item, pdfUrl, 'arXiv', paperId, collectionKey, dataDir);
   });
 
@@ -505,33 +482,8 @@ export function registerIpcHandlers(
     if (results.length === 0 || results[0].values.length === 0) {
       throw new Error(`Conference paper ${paperId} not found`);
     }
-    const row = results[0].values[0];
 
-    const shortName = row[7] as string;
-    const year = row[8] as number;
-    const fullName = (row[9] as string) || `${shortName} ${year}`;
-
-    const item: ConnectorItem = {
-      id: 'item_0',
-      itemType: 'conferencePaper',
-      title: row[1] as string,
-      abstractNote: (row[3] as string) || '',
-      date: String(year),
-      url: (row[4] as string) || '',
-      proceedingsTitle: fullName,
-      conferenceName: `${shortName} ${year}`,
-      pages: (row[6] as string) || '',
-      repository: shortName,
-      archiveID: paperId,
-      creators: parseCreators(JSON.parse(row[2] as string)),
-      tags: [],
-      notes: buildNotes(summaryHtml, analysisHtml).map(n => ({ note: n })),
-      attachments: [],
-      seeAlso: [],
-    };
-
-    const pdfUrl = (row[5] as string) || '';
-    const category = `${shortName}${year}`;
+    const { item, pdfUrl, category } = buildConferenceExportItem(results[0].values[0], summaryHtml, analysisHtml);
     return exportToZotero(item, pdfUrl, category, paperId, collectionKey, dataDir);
   });
 

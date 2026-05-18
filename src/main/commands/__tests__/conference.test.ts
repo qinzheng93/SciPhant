@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import {
   listConferences, listConferencePapers,
   listConferenceTracks, getConferencePaperPdfUrl,
+  getCategoryForConference,
 } from '../conference-paper.js';
 import {
   stopConferenceSummary,
@@ -140,6 +141,23 @@ describe('conference-paper commands', () => {
 
     it('returns null for missing paper', () => {
       expect(getConferencePaperPdfUrl(confDb, 'nonexistent')).toBeNull();
+    });
+  });
+
+  describe('getCategoryForConference', () => {
+    it('returns short_name + year for a paper', () => {
+      confDb.run("INSERT INTO conferences VALUES (1, 'CVPR', 2025, '')");
+      confDb.run("INSERT INTO papers VALUES ('p1', 1, 'Title', '[]', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL)");
+      expect(getCategoryForConference(confDb, 'p1')).toBe('CVPR2025');
+    });
+
+    it('returns null when paper does not exist', () => {
+      expect(getCategoryForConference(confDb, 'nonexistent')).toBeNull();
+    });
+
+    it('returns null when conference does not exist for paper', () => {
+      confDb.run("INSERT INTO papers VALUES ('p1', 999, 'Title', '[]', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL)");
+      expect(getCategoryForConference(confDb, 'p1')).toBeNull();
     });
   });
 

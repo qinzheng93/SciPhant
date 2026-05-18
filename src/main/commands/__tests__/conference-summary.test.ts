@@ -18,7 +18,6 @@ vi.mock('../paper-shared.js', () => ({
 }));
 
 import {
-  getCategoryForConference,
   checkConferenceSummaryStatus,
   getConferenceSummaryContent,
   stopConferenceSummary,
@@ -89,29 +88,6 @@ describe('conference-summary', () => {
     conferenceDb.run(CONFERENCE_SCHEMA);
     settingsDb = new SQL.Database();
     paperTopicsDb = new SQL.Database();
-  });
-
-  describe('getCategoryForConference', () => {
-    it('returns short_name + year for a paper', () => {
-      insertConference(conferenceDb, 1, 'CVPR', 2025);
-      insertConfPaper(conferenceDb, 'p1', 'Title', 'Abstract', 1);
-      expect(getCategoryForConference(conferenceDb, 'p1')).toBe('CVPR2025');
-    });
-
-    it('returns null when paper does not exist', () => {
-      expect(getCategoryForConference(conferenceDb, 'nonexistent')).toBeNull();
-    });
-
-    it('returns null when conference does not exist for paper', () => {
-      insertConfPaper(conferenceDb, 'p1', 'Title', 'Abstract', 999);
-      expect(getCategoryForConference(conferenceDb, 'p1')).toBeNull();
-    });
-
-    it('handles different conference names', () => {
-      insertConference(conferenceDb, 2, 'ICLR', 2024);
-      insertConfPaper(conferenceDb, 'p2', 'Title', 'Abstract', 2);
-      expect(getCategoryForConference(conferenceDb, 'p2')).toBe('ICLR2024');
-    });
   });
 
   describe('checkConferenceSummaryStatus', () => {

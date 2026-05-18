@@ -2,13 +2,15 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
 import {
-  rowToPaper,
   execResultToPaperRows,
   buildSearchPattern,
   createAbortControllerManager,
   loadEnabledTopicNames,
   filterByTopicIds,
+  matchesKeywords,
+  filterPaperTopics,
 } from '../paper-shared.js';
+import type { Topic } from '../../../shared/ipc-api.js';
 
 const TOPICS_SCHEMA = `
 CREATE TABLE IF NOT EXISTS topics (
@@ -60,44 +62,6 @@ describe('execResultToPaperRows', () => {
     };
     const rows = execResultToPaperRows(result);
     expect(rows[0].abstract).toBe('This has "quotes" and new\nlines');
-  });
-});
-
-describe('rowToPaper', () => {
-  it('parses JSON authors and categories', () => {
-    const row: Record<string, unknown> = {
-      id: '1234.5678',
-      title: 'Test Paper',
-      authors: '["Alice", "Bob"]',
-      abstract: 'Abstract',
-      url: 'https://arxiv.org/abs/1234.5678',
-      pdf_url: 'https://arxiv.org/pdf/1234.5678.pdf',
-      published_date: '2024-03-15',
-      updated_date: '2024-03-15',
-      categories: '["cs.AI", "cs.LG"]',
-      fetched_at: '2024-03-15',
-    };
-    const paper = rowToPaper(row);
-    expect(paper.authors).toEqual(['Alice', 'Bob']);
-    expect(paper.categories).toEqual(['cs.AI', 'cs.LG']);
-  });
-
-  it('handles empty arrays', () => {
-    const row: Record<string, unknown> = {
-      id: '1',
-      title: 'T',
-      authors: '[]',
-      abstract: '',
-      url: '',
-      pdf_url: '',
-      published_date: '',
-      updated_date: '',
-      categories: '[]',
-      fetched_at: '',
-    };
-    const paper = rowToPaper(row);
-    expect(paper.authors).toEqual([]);
-    expect(paper.categories).toEqual([]);
   });
 });
 
@@ -233,5 +197,58 @@ describe('filterByTopicIds', () => {
     const bindValues: unknown[] = [];
     filterByTopicIds(topicsDb, 'conference_paper_topics', [1], conditions, bindValues);
     expect(bindValues).toEqual(['conf1']);
+  });
+});
+
+describe('matchesKeywords', () => {
+  it('returns true when text contains a keyword', () => {
+    expect(matchesKeywords('Hello World', ['world'])).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(matchesKeywords('Hello World', ['WORLD'])).toBe(true);
+    expect(matchesKeywords('HELLO WORLD', ['hello'])).toBe(true);
+  });
+
+  it('returns false when no keyword matches', () => {
+    expect(matchesKeywords('Hello World', ['foo', 'bar'])).toBe(false);
+  });
+
+  it('returns false for empty keywords', () => {
+    expect(matchesKeywords('Hello World', [])).toBe(false);
+  });
+
+  it('handles partial matches', () => {
+    expect(matchesKeywords('machine learning', ['learn'])).toBe(true);
+  });
+});
+
+describe('filterPaperTopics', () => {
+  const topics: Topic[] = [
+    { id: 1, name: 'AI', keywords: ['ai', 'artificial intelligence'], enabled: true },
+    { id: 2, name: 'Crypto', keywords: ['crypto', 'blockchain'], enabled: true },
+    { id: 3, name: 'Unused', keywords: ['unused'], enabled: true },
+  ];
+
+  it('returns matching topic IDs', () => {
+    const result = filterPaperTopics('Advances in AI', 'We study artificial intelligence.', topics);
+    expect(result).toContain(1);
+    expect(result).not.toContain(2);
+    expect(result).not.toContain(3);
+  });
+
+  it('matches keywords in both title and abstract', () => {
+    const result = filterPaperTopics('Title', 'Abstract mentions blockchain.', topics);
+    expect(result).toContain(2);
+  });
+
+  it('returns multiple matches', () => {
+    const result = filterPaperTopics('AI and crypto', 'Abstract.', topics);
+    expect(result).toEqual([1, 2]);
+  });
+
+  it('returns empty array when nothing matches', () => {
+    const result = filterPaperTopics('Biology', 'Genetics study.', topics);
+    expect(result).toEqual([]);
   });
 });

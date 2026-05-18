@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { listArxivPapers, listArxivFetchDates } from '../arxiv-paper.js';
+import { listArxivPapers, listArxivFetchDates, rowToPaper, ARXIV_CATEGORY } from '../arxiv-paper.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS papers (
@@ -201,5 +201,49 @@ describe('listArxivFetchDates', () => {
     insertPaper(db, '1', 'A', '2024-03-10');
     const dates = listArxivFetchDates(db);
     expect(dates[0].display).toBe('2024年3月10日');
+  });
+});
+
+describe('ARXIV_CATEGORY', () => {
+  it('exports arXiv as the category constant', () => {
+    expect(ARXIV_CATEGORY).toBe('arXiv');
+  });
+});
+
+describe('rowToPaper', () => {
+  it('parses JSON authors and categories', () => {
+    const row: Record<string, unknown> = {
+      id: '1234.5678',
+      title: 'Test Paper',
+      authors: '["Alice", "Bob"]',
+      abstract: 'Abstract',
+      url: 'https://arxiv.org/abs/1234.5678',
+      pdf_url: 'https://arxiv.org/pdf/1234.5678.pdf',
+      published_date: '2024-03-15',
+      updated_date: '2024-03-15',
+      categories: '["cs.AI", "cs.LG"]',
+      fetched_at: '2024-03-15',
+    };
+    const paper = rowToPaper(row);
+    expect(paper.authors).toEqual(['Alice', 'Bob']);
+    expect(paper.categories).toEqual(['cs.AI', 'cs.LG']);
+  });
+
+  it('handles empty arrays', () => {
+    const row: Record<string, unknown> = {
+      id: '1',
+      title: 'T',
+      authors: '[]',
+      abstract: '',
+      url: '',
+      pdf_url: '',
+      published_date: '',
+      updated_date: '',
+      categories: '[]',
+      fetched_at: '',
+    };
+    const paper = rowToPaper(row);
+    expect(paper.authors).toEqual([]);
+    expect(paper.categories).toEqual([]);
   });
 });

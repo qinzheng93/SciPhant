@@ -1,25 +1,10 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
-import type { ArxivPaper } from '../../shared/ipc-api.js';
 import type { DeepAnalysisResult } from '../services/llm-client.js';
 import type { Topic } from '../../shared/ipc-api.js';
-import { filterPaperTopics } from '../services/filter.js';
 import { LLMClient } from '../services/llm-client.js';
 import { loadLLMConfig } from './config.js';
 import { extractTextFromUrl } from '../services/pdf-extractor.js';
 import { writeAnalysisFile, readAnalysisFile } from '../services/analysis-files.js';
-
-export const BASE_SQL = `SELECT
-    p.id, p.title, p.authors, p.abstract, p.url, p.pdf_url,
-    p.published_date, p.updated_date, p.categories, p.fetched_at
-FROM papers p`;
-
-export function rowToPaper(row: Record<string, unknown>): ArxivPaper {
-  return {
-    ...row,
-    authors: JSON.parse(row.authors as string),
-    categories: JSON.parse(row.categories as string),
-  } as ArxivPaper;
-}
 
 export function execResultToPaperRows(results: { columns: string[]; values: unknown[][] }): Record<string, unknown>[] {
   return results.values.map(row => {
@@ -230,4 +215,18 @@ export function rebuildPaperTopicsSingle(opts: RebuildOptions, topicId: number):
   }
   opts.paperTopicsDb.run('COMMIT');
   return count;
+}
+
+// ── Topic keyword filtering ──
+
+export function matchesKeywords(text: string, keywords: string[]): boolean {
+  const textLower = text.toLowerCase();
+  return keywords.some(kw => textLower.includes(kw.toLowerCase()));
+}
+
+export function filterPaperTopics(title: string, abstractText: string, topics: Topic[]): number[] {
+  const text = `${title} ${abstractText}`;
+  return topics
+    .filter(topic => matchesKeywords(text, topic.keywords))
+    .map(topic => topic.id);
 }

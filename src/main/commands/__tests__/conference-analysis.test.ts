@@ -12,7 +12,7 @@ vi.mock('../paper-shared.js', () => ({
   getPaperAnalysisContent: vi.fn(),
 }));
 
-vi.mock('../conference-summary.js', () => ({
+vi.mock('../conference-paper.js', () => ({
   getCategoryForConference: vi.fn(),
 }));
 
@@ -23,7 +23,7 @@ import {
   getConferencePaperAnalysis,
 } from '../conference-analysis.js';
 import { analyzeFullPaperCore, getPaperAnalysisContent } from '../paper-shared.js';
-import { getCategoryForConference } from '../conference-summary.js';
+import { getCategoryForConference } from '../conference-paper.js';
 
 describe('conference-analysis', () => {
   let SQL: any;

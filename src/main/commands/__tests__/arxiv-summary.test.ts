@@ -17,13 +17,16 @@ vi.mock('../paper-shared.js', () => ({
   summarizePaperCore: vi.fn(),
 }));
 
+vi.mock('../arxiv-paper.js', () => ({
+  ARXIV_CATEGORY: 'arXiv',
+}));
+
 import {
   checkArxivSummaryStatus,
   getArxivSummaryContent,
   stopArxivSummary,
   setArxivSummaryAbortController,
   summarizeArxivPaper,
-  ARXIV_CATEGORY,
 } from '../arxiv-summary.js';
 import { listExistingPaperIds, readAnalysisFile } from '../../services/analysis-files.js';
 import { summarizePaperCore } from '../paper-shared.js';
@@ -75,12 +78,6 @@ describe('arxiv-summary', () => {
     db.run(SCHEMA);
     settingsDb = new SQL.Database();
     paperTopicsDb = new SQL.Database();
-  });
-
-  describe('ARXIV_CATEGORY', () => {
-    it('exports arXiv as the category constant', () => {
-      expect(ARXIV_CATEGORY).toBe('arXiv');
-    });
   });
 
   describe('checkArxivSummaryStatus', () => {

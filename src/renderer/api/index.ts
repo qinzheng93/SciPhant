@@ -1,17 +1,10 @@
-import type { ReadImportResult, ConflictInfo, ConflictResolution, ImportResult } from '../../shared/ipc-api'
+import type {
+  ReadImportResult, ConflictInfo, ConflictResolution, ImportResult,
+  PaginatedResult, FetchDate, ZoteroCollection,
+  ArxivFetchPapersResult, ArxivFetchPapersByDateResult, FetchPapersByIdsResult,
+} from '../../shared/ipc-api'
 
-export interface PaginatedResult<T> {
-  items: T[]
-  total: number
-  page: number
-  page_size: number
-}
-
-export interface FetchDate {
-  date: string
-  display: string
-  count: number
-}
+export type { PaginatedResult, FetchDate, ZoteroCollection }
 
 // Paper API
 export const listArxivPapers = async (params: {
@@ -95,19 +88,6 @@ export const deleteCategory = async (categoryId: number): Promise<void> => {
 }
 
 // Fetch API
-export interface ArxivFailedCategory {
-  category: string
-  error: string
-}
-
-export interface ArxivFetchPapersResult {
-  success: boolean
-  new_count: number
-  existing_count: number
-  failed_categories: string[]
-  failed_details: ArxivFailedCategory[]
-}
-
 export const openArxivPdf = async (paperId: string): Promise<void> => {
   return window.api.openArxivPdf(paperId)
 }
@@ -120,32 +100,8 @@ export const fetchArxivPapersThisWeek = async (categories?: string[]): Promise<A
   return window.api.fetchArxivPapersThisWeek(categories)
 }
 
-export interface ArxivFetchPapersByDateParams {
-  startDate: string
-  endDate: string
-  categories?: string[]
-}
-
-export interface ArxivFetchPapersByDateResult {
-  success: boolean
-  local_count: number
-  new_count: number
-  total_count: number
-  failed_categories: string[]
-  failed_details: ArxivFailedCategory[]
-  error?: string
-}
-
-export const fetchArxivPapersByDate = async (params: ArxivFetchPapersByDateParams): Promise<ArxivFetchPapersByDateResult> => {
+export const fetchArxivPapersByDate = async (params: { startDate: string; endDate: string; categories?: string[] }): Promise<ArxivFetchPapersByDateResult> => {
   return window.api.fetchArxivPapersByDate(params)
-}
-
-export interface FetchPapersByIdsResult {
-  success: boolean
-  fetched: { id: string; title: string }[]
-  existing: number
-  failed: number
-  errors: string[]
 }
 
 export const fetchArxivPapersByIds = async (input: string): Promise<FetchPapersByIdsResult> => {
@@ -200,12 +156,6 @@ export const resetDataDir = async (): Promise<{ success: boolean }> => {
 }
 
 // Zotero API
-export interface ZoteroCollection {
-  key: string
-  name: string
-  numItems: number
-}
-
 export const listZoteroCollections = async (): Promise<ZoteroCollection[]> => {
   return window.api.listZoteroCollections()
 }

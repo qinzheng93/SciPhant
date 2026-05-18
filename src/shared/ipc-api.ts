@@ -3,6 +3,19 @@
 
 // ── Data types ──
 
+export interface PaginatedResult<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface FetchDate {
+  date: string
+  display: string
+  count: number
+}
+
 export interface ArxivPaper {
   id: string
   title: string
@@ -53,6 +66,43 @@ export interface Category {
   id: number
   name: string
   enabled: boolean
+}
+
+export interface ZoteroCollection {
+  key: string
+  name: string
+  numItems: number
+}
+
+export interface ArxivFailedCategory {
+  category: string
+  error: string
+}
+
+export interface ArxivFetchPapersResult {
+  success: boolean
+  new_count: number
+  existing_count: number
+  failed_categories: string[]
+  failed_details: ArxivFailedCategory[]
+}
+
+export interface ArxivFetchPapersByDateResult {
+  success: boolean
+  local_count: number
+  new_count: number
+  total_count: number
+  failed_categories: string[]
+  failed_details: ArxivFailedCategory[]
+  error?: string
+}
+
+export interface FetchPapersByIdsResult {
+  success: boolean
+  fetched: { id: string; title: string }[]
+  existing: number
+  failed: number
+  errors: string[]
 }
 
 export interface LLMConfig {

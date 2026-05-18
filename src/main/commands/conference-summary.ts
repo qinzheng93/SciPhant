@@ -4,21 +4,8 @@ import {
   listExistingPaperIds,
 } from '../services/analysis-files.js';
 import { createAbortControllerManager, summarizePaperCore } from './paper-shared.js';
-
-/**
- * Get the conference category string (e.g. "CVPR2025") for a conference paper.
- */
-export function getCategoryForConference(
-  conferenceDb: SqlJsDatabase,
-  paperId: string,
-): string | null {
-  const results = conferenceDb.exec(
-    'SELECT c.short_name, c.year FROM papers p JOIN conferences c ON p.conference_id = c.id WHERE p.id = ?',
-    [paperId],
-  );
-  if (results.length === 0 || results[0].values.length === 0) return null;
-  return `${results[0].values[0][0]}${results[0].values[0][1]}`;
-}
+import { buildConferenceCategory } from './conference-paper.js';
+import { getCategoryForConference } from './conference-paper.js';
 
 /**
  * Check summary status for a batch of conference papers.
@@ -52,7 +39,7 @@ export async function checkConferenceSummaryStatus(
       [confId],
     );
     if (confResults.length > 0 && confResults[0].values.length > 0) {
-      categoryCache.set(confId, `${confResults[0].values[0][0]}${confResults[0].values[0][1]}`);
+      categoryCache.set(confId, buildConferenceCategory(confResults[0].values[0][0] as string, confResults[0].values[0][1] as number));
     }
   }
 

@@ -2,6 +2,22 @@ import type { Database as SqlJsDatabase } from 'sql.js';
 import type { ConferencePaper, ConferenceInfo } from '../../shared/ipc-api.js';
 import { execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared.js';
 
+export function buildConferenceCategory(shortName: string, year: number): string {
+  return `${shortName}${year}`;
+}
+
+export function getCategoryForConference(
+  conferenceDb: SqlJsDatabase,
+  paperId: string,
+): string | null {
+  const results = conferenceDb.exec(
+    'SELECT c.short_name, c.year FROM papers p JOIN conferences c ON p.conference_id = c.id WHERE p.id = ?',
+    [paperId],
+  );
+  if (results.length === 0 || results[0].values.length === 0) return null;
+  return buildConferenceCategory(results[0].values[0][0] as string, results[0].values[0][1] as number);
+}
+
 interface ConferencePaginatedResult {
   items: ConferencePaper[];
   total: number;

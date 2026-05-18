@@ -4,8 +4,9 @@ import {
   listExistingPaperIds,
 } from '../services/analysis-files.js';
 import { createAbortControllerManager, summarizePaperCore } from './paper-shared.js';
+import { ARXIV_CATEGORY } from './arxiv-paper.js';
 
-export const ARXIV_CATEGORY = 'arXiv';
+export { ARXIV_CATEGORY };
 
 /**
  * Check summary status for a batch of arXiv papers.

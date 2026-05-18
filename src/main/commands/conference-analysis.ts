@@ -1,6 +1,6 @@
 import type { Database as SqlJsDatabase } from 'sql.js';
 import type { DeepAnalysisResult } from '../services/llm-client.js';
-import { getCategoryForConference } from './conference-summary.js';
+import { getCategoryForConference } from './conference-paper.js';
 import { createAbortControllerManager, analyzeFullPaperCore, getPaperAnalysisContent, type ProgressCallback } from './paper-shared.js';
 
 const abortMgr = createAbortControllerManager();

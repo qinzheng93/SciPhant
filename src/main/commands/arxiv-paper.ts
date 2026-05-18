@@ -14,7 +14,22 @@ interface FetchDate {
   count: number;
 }
 
-import { BASE_SQL, rowToPaper, execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared.js';
+import { execResultToPaperRows, buildSearchPattern, filterByTopicIds } from './paper-shared.js';
+
+export const ARXIV_CATEGORY = 'arXiv';
+
+export const BASE_SQL = `SELECT
+    p.id, p.title, p.authors, p.abstract, p.url, p.pdf_url,
+    p.published_date, p.updated_date, p.categories, p.fetched_at
+FROM papers p`;
+
+export function rowToPaper(row: Record<string, unknown>): ArxivPaper {
+  return {
+    ...row,
+    authors: JSON.parse(row.authors as string),
+    categories: JSON.parse(row.categories as string),
+  } as ArxivPaper;
+}
 
 /**
  * List papers with pagination and filtering.

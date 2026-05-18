@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import type { SchemaIssue, SourceConference, ConflictInfo, ConflictResolution, ImportResult } from '../../shared/ipc-api.js';
 import { getSqlJs } from '../database/connection.js';
 import { deleteAnalysisFile } from '../services/analysis-files.js';
+import { buildConferenceCategory } from './conference-paper.js';
 
 // ── Schema Validation ──
 
@@ -113,7 +114,7 @@ export async function clearAnalysisForConference(
   if (confResult.length === 0) return;
   const shortName = confResult[0].values[0][0] as string;
   const year = confResult[0].values[0][1] as number;
-  const category = `${shortName}${year}`;
+  const category = buildConferenceCategory(shortName, year);
 
   const paperResult = targetDb.exec(
     'SELECT id FROM papers WHERE conference_id = ?',
