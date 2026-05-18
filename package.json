@@ -2,7 +2,7 @@
   "name": "blueberry",
   "productName": "Blueberry",
   "private": true,
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "桌面应用，用于抓取、过滤和分析 arXiv 论文及会议论文，支持 LLM 总结与深度分析",
   "author": "Blueberry Developer",
   "main": "dist/main/index.js",
