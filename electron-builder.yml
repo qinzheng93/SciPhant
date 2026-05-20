@@ -8,6 +8,10 @@ directories:
 files:
   - dist/**/*
   - node_modules/sql.js/**/*
+publish:
+  provider: github
+  owner: qinzheng93
+  repo: Blueberry
 mac:
   icon: resources/icon.icns
   category: public.app-category.productivity
@@ -26,7 +30,11 @@ dmg:
       path: /Applications
 win:
   target:
-    - portable
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: Blueberry
 linux:
   target:
     - AppImage

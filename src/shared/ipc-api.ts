@@ -227,6 +227,13 @@ export interface ElectronAPI {
   conferenceReadImportFile: () => Promise<ReadImportResult | null>
   conferenceCheckConflicts: (filePath: string, selectedIds: number[]) => Promise<ConflictInfo[]>
   conferenceImport: (options: { filePath: string; resolutions: ConflictResolution[]; selectedConferenceIds?: number[] }) => Promise<ImportResult>
+
+  // Auto-updater
+  checkForUpdate: () => Promise<UpdateAvailableInfo | null>
+  downloadUpdate: () => Promise<string[]>
+  installUpdate: () => Promise<void>
+  getAppVersion: () => Promise<string>
+  onUpdaterStatus: (callback: (event: UpdaterStatusEvent) => void) => () => void
 }
 
 // ── Conference import sub-types ──
@@ -269,4 +276,17 @@ export interface ImportResult {
   importedPapers: number
   skippedConferences: number
   error?: string
+}
+
+// ── Auto-updater types ──
+
+export interface UpdaterStatusEvent {
+  status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+  data?: unknown
+}
+
+export interface UpdateAvailableInfo {
+  version: string
+  releaseDate: string
+  releaseNotes: string | null
 }

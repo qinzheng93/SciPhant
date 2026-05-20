@@ -98,6 +98,19 @@ const api: ElectronAPI = {
   conferenceReadImportFile: () => ipcRenderer.invoke('conference:read-import-file'),
   conferenceCheckConflicts: (filePath, selectedIds) => ipcRenderer.invoke('conference:check-conflicts', filePath, selectedIds),
   conferenceImport: (options) => ipcRenderer.invoke('conference:import', options),
+
+  // Auto-updater
+  checkForUpdate: () => ipcRenderer.invoke('updater:check-for-update'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:download-update'),
+  installUpdate: () => ipcRenderer.invoke('updater:install-update'),
+  getAppVersion: () => ipcRenderer.invoke('updater:get-version'),
+  onUpdaterStatus: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => {
+      callback(data as import('../shared/ipc-api.js').UpdaterStatusEvent);
+    };
+    ipcRenderer.on('updater:status', handler);
+    return () => ipcRenderer.removeListener('updater:status', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

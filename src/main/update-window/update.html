@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blueberry Update</title>
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --border-primary: #e8e8e8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #374151;
+    --text-tertiary: #6b7280;
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-error: #dc2626;
+    --radius: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1a1a1a;
+      --bg-secondary: #222222;
+      --border-primary: #333333;
+      --text-primary: #f0f0f0;
+      --text-secondary: #d1d5db;
+      --text-tertiary: #9ca3af;
+      --color-primary: #3b82f6;
+      --color-primary-hover: #2563eb;
+      --color-error: #f87171;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 40px 24px 24px;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .version {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .version span {
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .changelog {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    padding: 12px;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 16px;
+  }
+
+  .progress-container { margin: 16px 0; }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+
+  button {
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border-primary);
+    transition: all 0.15s ease;
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-secondary);
+  }
+
+  .status-text {
+    font-size: 14px;
+    color: var(--text-tertiary);
+    margin: 20px 0;
+    text-align: center;
+  }
+
+  .error-text {
+    color: var(--color-error);
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <!-- Available state -->
+  <div id="state-available">
+    <div class="title">发现新版本</div>
+    <div class="version">新版本: <span id="new-version"></span></div>
+    <div class="changelog" id="changelog"></div>
+    <div class="actions">
+      <button class="btn-secondary" onclick="closeWindow()">稍后</button>
+      <button class="btn-primary" onclick="startDownload()">下载更新</button>
+    </div>
+  </div>
+
+  <!-- Downloading state -->
+  <div id="state-downloading" class="hidden">
+    <div class="title">正在下载更新</div>
+    <div class="progress-container">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-info">
+        <span id="progress-percent">0%</span>
+        <span id="progress-speed"></span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn-secondary" onclick="closeWindow()">稍后</button>
+    </div>
+  </div>
+
+  <!-- Downloaded state -->
+  <div id="state-downloaded" class="hidden">
+    <div class="title">更新已就绪</div>
+    <div class="status-text">新版本已下载完成，需要重启应用以完成安装。</div>
+    <div class="actions">
+      <button class="btn-secondary" onclick="closeWindow()">下次启动时安装</button>
+      <button class="btn-primary" onclick="installNow()">立即重启</button>
+    </div>
+  </div>
+
+  <!-- Error state -->
+  <div id="state-error" class="hidden">
+    <div class="title">更新失败</div>
+    <div class="status-text error-text" id="error-message"></div>
+    <div class="actions">
+      <button class="btn-primary" onclick="closeWindow()">关闭</button>
+    </div>
+  </div>
+
+<script>
+  // State management
+  function showState(stateId) {
+    document.querySelectorAll('[id^="state-"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById('state-' + stateId).classList.remove('hidden');
+  }
+
+  // Listen for updater status events
+  window.api.onUpdaterStatus(({ status, data }) => {
+    switch (status) {
+      case 'available':
+        document.getElementById('new-version').textContent = 'v' + data.version;
+        document.getElementById('changelog').textContent =
+          typeof data.releaseNotes === 'string'
+            ? data.releaseNotes
+            : Array.isArray(data.releaseNotes)
+              ? data.releaseNotes.map(n => n.note).join('\n')
+              : '';
+        showState('available');
+        break;
+      case 'downloading':
+        document.getElementById('progress-fill').style.width = data.percent + '%';
+        document.getElementById('progress-percent').textContent = Math.round(data.percent) + '%';
+        document.getElementById('progress-speed').textContent = formatSpeed(data.bytesPerSecond);
+        showState('downloading');
+        break;
+      case 'downloaded':
+        showState('downloaded');
+        break;
+      case 'error':
+        document.getElementById('error-message').textContent = data.message || '未知错误';
+        showState('error');
+        break;
+    }
+  });
+
+  function formatSpeed(bytesPerSecond) {
+    if (bytesPerSecond < 1024) return bytesPerSecond + ' B/s';
+    if (bytesPerSecond < 1048576) return (bytesPerSecond / 1024).toFixed(1) + ' KB/s';
+    return (bytesPerSecond / 1048576).toFixed(1) + ' MB/s';
+  }
+
+  // Button handlers
+  function startDownload() {
+    window.api.downloadUpdate();
+    showState('downloading');
+  }
+
+  function installNow() {
+    window.api.installUpdate();
+  }
+
+  function closeWindow() {
+    window.close();
+  }
+</script>
+</body>
+</html>

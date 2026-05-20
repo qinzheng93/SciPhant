@@ -2,6 +2,7 @@ import type {
   ReadImportResult, ConflictInfo, ConflictResolution, ImportResult,
   PaginatedResult, FetchDate, ZoteroCollection,
   ArxivFetchPapersResult, ArxivFetchPapersByDateResult, FetchPapersByIdsResult,
+  UpdaterStatusEvent,
 } from '../../shared/ipc-api'
 
 export type { PaginatedResult, FetchDate, ZoteroCollection }
@@ -262,4 +263,25 @@ export const conferenceImport = async (options: {
   selectedConferenceIds?: number[];
 }): Promise<ImportResult> => {
   return window.api.conferenceImport(options)
+}
+
+// Auto-updater API
+export const checkForUpdate = async () => {
+  return window.api.checkForUpdate()
+}
+
+export const downloadUpdate = async (): Promise<string[]> => {
+  return window.api.downloadUpdate()
+}
+
+export const installUpdate = async (): Promise<void> => {
+  return window.api.installUpdate()
+}
+
+export const getAppVersion = async (): Promise<string> => {
+  return window.api.getAppVersion()
+}
+
+export const onUpdaterStatus = (callback: (event: UpdaterStatusEvent) => void): (() => void) => {
+  return window.api.onUpdaterStatus(callback)
 }

@@ -6,6 +6,7 @@ import { PaperTopicsDb } from './database/paper-topics.js';
 import { migrateFromOldAppData, migrateToSplitDatabases, migrateAnalysesToFiles } from './database/migrations.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
 import { loadDataDir } from './commands/config.js';
+import { initAutoUpdater } from './services/auto-updater.js';
 
 let mainWindow: BrowserWindow | null = null;
 let arxivDb: Database | null = null;
@@ -147,6 +148,11 @@ app.whenReady().then(async () => {
   }
 
   registerIpcHandlers(arxivDb, conferenceDb, settingsDb, paperTopicsDb, dataDir, createWindow());
+
+  // Initialize auto-updater (must be after window creation)
+  if (app.isPackaged && mainWindow) {
+    initAutoUpdater(mainWindow);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

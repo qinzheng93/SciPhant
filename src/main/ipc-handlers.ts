@@ -33,6 +33,7 @@ import {
   getConferenceSummaryContent,
 } from './commands/conference-summary.js';
 import { getCategoryForConference } from './commands/conference-paper.js';
+import { checkForUpdate, downloadUpdate, installUpdate, getAppVersion } from './services/auto-updater.js';
 
 function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
   ipcMain.handle(channel, async (_event, ...args) => {
@@ -567,4 +568,10 @@ export function registerIpcHandlers(
     if (result.canceled) return undefined;
     return result.filePaths[0];
   });
+
+  // Auto-updater
+  handle('updater:check-for-update', async () => checkForUpdate());
+  handle('updater:download-update', async () => downloadUpdate());
+  handle('updater:install-update', async () => installUpdate());
+  handle('updater:get-version', async () => getAppVersion());
 }
