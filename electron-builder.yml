@@ -12,6 +12,7 @@ publish:
   provider: github
   owner: qinzheng93
   repo: Blueberry
+  releaseType: release
 mac:
   icon: resources/icon.icns
   category: public.app-category.productivity
