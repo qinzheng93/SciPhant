@@ -1,7 +1,10 @@
 import { BrowserWindow } from 'electron';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 let updateWindow: BrowserWindow | null = null;
+
+// __dirname is dist/main/services/ — resolve relative to dist/main/
+const mainRoot = resolve(__dirname, '..');
 
 export function showUpdateWindow(): void {
   if (updateWindow && !updateWindow.isDestroyed()) {
@@ -17,12 +20,12 @@ export function showUpdateWindow(): void {
     title: 'Blueberry Update',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
+      preload: join(mainRoot, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
-  updateWindow.loadFile(join(__dirname, 'update-window/update.html'));
+  updateWindow.loadFile(join(mainRoot, 'update-window/update.html'));
   updateWindow.on('closed', () => {
     updateWindow = null;
   });
