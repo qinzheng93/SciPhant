@@ -17,23 +17,23 @@ export interface RawPaper {
 
 // ── Date helpers ──────────────────────────────────────────────
 
-/** Format a Date as YYYY-MM-DD using local system date. */
+/** Format a Date as YYYY-MM-DD in UTC. */
 function toDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
-/** Get today's date string (YYYY-MM-DD). */
+/** Get today's date string (YYYY-MM-DD) in UTC. */
 export function todayStr(): string {
   return toDateString(new Date());
 }
 
-/** Get date string for N days ago (YYYY-MM-DD). */
+/** Get date string for N days ago (YYYY-MM-DD) in UTC. */
 export function daysAgoStr(n: number): string {
   const d = new Date();
-  d.setDate(d.getDate() - n);
+  d.setUTCDate(d.getUTCDate() - n);
   return toDateString(d);
 }
 
